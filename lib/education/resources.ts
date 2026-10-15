@@ -1,0 +1,33 @@
+export const references = [
+ {id:'pfsense',title:'pfSense · قواعد و وضعیت اتصال',publisher:'Netgate / pfSense',kind:'راهنمای دستگاه',url:'https://docs.netgate.com/pfsense/en/latest/firewall/firewall-rule-basics.html',source:'https://github.com/pfsense/docs/blob/master/source/firewall/firewall-rule-basics.rst',summary:'قانون عبور، برای اتصال یک State می‌سازد؛ پاسخ‌های همان اتصال با وضعیت تطبیق داده می‌شوند. ترتیب قوانین در تصمیم اتصال تازه اثر دارد.',points:['در نمونهٔ این درس NAT خاموش است تا مسیر فیلتر روشن باشد.','مدل بازشونده، اجزای عملکردی یک دروازه است؛ چیدمان برد یک محصول تجاری نیست.','تغییر قانون لزوماً وضعیت اتصال موجود را حذف نمی‌کند؛ چرخهٔ State را جدا بررسی کن.']},
+ {id:'suricata',title:'Suricata · حسگر و رویداد EVE',publisher:'OISF',kind:'راهنمای نرم‌افزار',url:'https://docs.suricata.io/en/latest/output/eve/eve-json-output.html',source:'https://github.com/OISF/suricata/blob/master/doc/userguide/output/eve/eve-json-output.rst',summary:'EVE رویدادها را به صورت JSON خروجی می‌دهد. هشدار، جریان و فرادادهٔ پروتکل می‌توانند با flow_id به هم مرتبط شوند.',points:['در حالت IDS، حسگر به‌تنهایی ترافیک عبوری را مسدود نمی‌کند.','در حالت IPS و مسیر Inline، قواعد مناسب می‌توانند بسته را Drop کنند.','timestamp، src_ip، dest_ip و alert.signature سرنخ‌های یک بررسی هستند.']},
+ {id:'attack',title:'MITRE ATT&CK · رفتار و زنجیرهٔ نفوذ',publisher:'MITRE',kind:'چارچوب مرجع',url:'https://attack.mitre.org/',source:'https://github.com/mitre/cti/tree/master/enterprise-attack',summary:'تاکتیک هدف و تکنیک روش انجام یک رفتار است. پنج ایستگاه مأموریت از دادهٔ رسمی Enterprise ATT&CK انتخاب شده‌اند.',points:['T1566.001 · پیوست فیشینگ','T1059.001 · PowerShell؛ T1003 · دسترسی به اعتبارنامه‌های سیستم','T1021.001 · RDP؛ T1041 · خروج داده روی کانال C2','ترتیب این مأموریت یک روایت آموزشی است، نه ترتیب اجباری ATT&CK.']},
+ {id:'least-privilege',title:'کمترین دسترسی و هویت',publisher:'SooVers · یادداشت کلاس',kind:'یادداشت آموزشی',url:'https://csrc.nist.gov/glossary/term/least_privilege',source:'https://csrc.nist.gov/glossary/term/least_privilege',summary:'هر هویت فقط مجوزهای مورد نیاز برای وظیفهٔ خود را دریافت می‌کند. این یادداشت همراه مسیر Linux Foundations کتابخانه است.',points:['کاربر و گروه را از مجوز فایل جدا کن.','هویت معتبر به معنی مجوز نامحدود نیست.']}
+] as const;
+export const missionStages = [
+ {id:'T1566.001',name:'پیوست مشکوک',tactic:'Initial Access',zone:'دروازهٔ پیام',layer:'لایهٔ کاربرد · ایمیل',evidence:'09:41  mail-gateway → invoice.docm\nFrom: billing@example.invalid\nAttachment: macro-enabled document',prompt:'قبل از بازشدن پیوست چه تصمیمی می‌گیری؟',options:['بازکردن روی سیستم اصلی','قرنطینه و بررسی پیوست در محیط تحلیل','ارسال برای همهٔ اعضای تیم'],correct:1,feedback:'پیوست را قرنطینه کردی. منشأ پیام و ساختار فایل، شواهد مرحلهٔ اول هستند.'},
+ {id:'T1059.001',name:'اجرای مشکوک',tactic:'Execution',zone:'ایستگاه کاربر',layer:'روی میزبان · پردازش',evidence:'09:43  host=WS-12\nparent=WINWORD.EXE\nchild=powershell.exe\nuser=analyst',prompt:'کدام داده برای ادامهٔ بررسی مهم‌تر است؟',options:['رابطهٔ والد و فرزند و زمان اجرا','رنگ پنجرهٔ برنامه','نام مدل مانیتور'],correct:0,feedback:'زنجیرهٔ پردازش ثبت شد. اجرای PowerShell به‌تنهایی حکم بدافزار نیست؛ زمینهٔ اجرا اهمیت دارد.'},
+ {id:'T1003',name:'مرز اعتبارنامه',tactic:'Credential Access',zone:'هستهٔ هویت',layer:'روی میزبان · حافظه و هویت',evidence:'09:44  endpoint-alert\nprocess=unknown.exe\ntarget=credential-store\naccess=unexpected',prompt:'برای حفظ شواهد و محدودکردن دامنه چه می‌کنی؟',options:['پاک‌کردن همهٔ لاگ‌ها','اشتراک‌گذاری گذرواژهٔ کاربر','جداسازی میزبان و ثبت شواهد فرّار طبق رویه'],correct:2,feedback:'میزبان جدا شد و شواهد در پرونده ماند. دامنهٔ استفاده از اعتبارنامه‌ها باید بررسی شود.'},
+ {id:'T1021.001',name:'حرکت میان میزبان‌ها',tactic:'Lateral Movement',zone:'پل دسترسی',layer:'سرویس RDP · شبکه و هویت',evidence:'09:46  WS-12 → SRV-02:3389\nservice=RDP\naccount=analyst\nfirst_seen=true',prompt:'کدام اقدام با شواهد این مرحله سازگار است؟',options:['اعتماد به تمام ترافیک داخلی','بررسی مجوز حساب و محدودکردن نشست مشکوک','خاموش‌کردن همهٔ تجهیزات'],correct:1,feedback:'نشست مشکوک محدود شد. یک ارتباط RDP می‌تواند مجاز باشد؛ هویت، دارایی و زمان را با هم بسنج.'},
+ {id:'T1041',name:'مرز خروج داده',tactic:'Exfiltration',zone:'دروازهٔ خروج',layer:'کانال کاربردی · ترافیک خروجی',evidence:'09:49  SRV-02 → 203.0.113.40\nchannel=previously-identified-C2\nbytes_out=84MB\nbaseline=2MB',prompt:'برای بستن چرخهٔ پاسخ کدام تصمیم را می‌گیری؟',options:['مهار کانال و ثبت مقصد، حجم و خط زمانی','فقط پاک‌کردن فایل گزارش','نادیده‌گرفتن چون ترافیک خروجی است'],correct:0,feedback:'کانال مهار و خط زمانی کامل شد. اکنون می‌توان پوشش تشخیص و اثر اقدام را بازبینی کرد.'}
+] as const;
+export function missionDecision(stage:number,choice:number){return Number.isInteger(stage)&&stage>=0&&stage<missionStages.length&&choice===missionStages[stage].correct;}
+export const deviceCatalog=[
+ {id:'firewall',name:'pfSense Gateway',category:'دروازهٔ امنیت شبکه',status:'کاوش تعاملی',ref:'pfsense',parts:[
+  {name:'رابط ورودی',en:'INGRESS',description:'بسته از رابط شبکه وارد می‌شود. آدرس، پورت و پروتکل برای بررسی در دسترس‌اند.'},
+  {name:'جدول وضعیت',en:'STATE TABLE',description:'بستهٔ مربوط به اتصال موجود با State تطبیق داده می‌شود. پاسخ مجاز همان اتصال می‌تواند عبور کند.'},
+  {name:'قواعد فیلتر',en:'RULESET',description:'برای اتصال تازه، قواعد طبق ترتیب بررسی می‌شوند. در این مدل ساده، قانون نخست منطبق، تصمیم عبور یا رد را می‌دهد.'},
+  {name:'رابط خروجی',en:'EGRESS',description:'بستهٔ مجاز به مسیر خروج می‌رود. رویداد ثبت‌شده برای بررسی در SOC استفاده می‌شود.'}
+ ]},
+ {id:'sensor',name:'Suricata IDS',category:'حسگر نرم‌افزاری شبکه',status:'کاوش تعاملی',ref:'suricata',parts:[
+  {name:'دریافت ترافیک',en:'CAPTURE',description:'نسخه‌ای از ترافیک به حسگر می‌رسد. در این نمونه حالت غیرفعال IDS را بررسی می‌کنیم.'},
+  {name:'رمزگشایی پروتکل',en:'DECODE / FLOW',description:'سرآیند پروتکل و جریان تحلیل می‌شود. این مرحله رمزگشایی محتوای TLS بدون کلید نیست.'},
+  {name:'موتور تشخیص',en:'DETECTION',description:'قواعد روی دادهٔ قابل مشاهده اعمال می‌شوند و رفتار منطبق می‌تواند هشدار ایجاد کند.'},
+  {name:'خروجی رویداد',en:'EVE JSON',description:'هشدار و فراداده در EVE ذخیره می‌شوند. flow_id برای مرتبط‌کردن رویدادهای یک جریان کاربرد دارد.'}
+ ]},
+] as const;
+export function packetTrace(device:number,sample:'normal'|'suspicious'|'established'){
+ if(device===1)return {steps:[0,1,2,3],verdict:sample==='suspicious'?'ALERT · ترافیک فقط مشاهده شد':'FLOW · جریان ثبت شد'};
+ if(sample==='established')return {steps:[0,1,3],verdict:'PASS · تطبیق با اتصال موجود'};
+ return sample==='suspicious'?{steps:[0,1,2],verdict:'BLOCK · اتصال تازه رد شد'}:{steps:[0,1,2,3],verdict:'PASS · اتصال تازه مجاز شد'};
+}

@@ -1,0 +1,22 @@
+{
+  "browser": "155.0.8059.40",
+  "renderer": "Chromium headless / SwiftShader",
+  "quality": "low",
+  "results": [
+    "Visitor access and reception permissions",
+    "Student classroom requires placement",
+    "Eight-question assessment and tailored advanced roadmap",
+    "Teacher lesson, wrong-answer recovery and completion",
+    "Seated classroom view, teacher captions and in-world lesson controls",
+    "Class whiteboard draw and undo",
+    "Student workstation performs full evidence/containment exercise",
+    "Shared incident and SOC tier handoff",
+    "Exploded 3D devices, firewall/IDS behavior and official reference",
+    "Five ATT&CK decisions, CTF validation and 100-point report export",
+    "Reload restores placement, course completion and classroom access",
+    "Changing role revokes access and returns to reception",
+    "Mobile portrait and landscape layouts stay inside viewport",
+    "No application errors or missing local assets"
+  ],
+  "errors": []
+}

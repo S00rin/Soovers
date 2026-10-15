@@ -1,0 +1,19 @@
+[Unit]
+Description=SooVers F5 Academy
+After=network.target
+[Service]
+Type=simple
+User=soovers
+Group=soovers
+WorkingDirectory=/opt/soovers/current
+ExecStart=/usr/bin/node server/index.mjs
+EnvironmentFile=/etc/soovers/academy.env
+StateDirectory=soovers
+UMask=0077
+Restart=on-failure
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+[Install]
+WantedBy=multi-user.target
