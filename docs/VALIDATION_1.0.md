@@ -22,7 +22,7 @@ API checks cover anonymous access denial, same-origin request enforcement, malfo
 
 Container validation runs an actual production image with an HTTPS public-origin configuration and a local HTTP reverse-proxy-style test connection. It verifies server behavior and cookie attributes; it does not install the infrastructure team's public TLS certificate or validate their external network.
 
-Validated local image ID: `sha256:9eec4fafe6f5d973af6e4c6f190238afc85651852a2383a140fef187878fdee6` (`soovers-academy:1.0.0`, Linux amd64). This is a local image identifier, not a published registry digest.
+Initial product build local image ID: `sha256:9eec4fafe6f5d973af6e4c6f190238afc85651852a2383a140fef187878fdee6` (`soovers-academy:1.0.0`, Linux amd64). This is a local image identifier, not a published registry digest.
 
 ## Evidence
 
@@ -37,3 +37,11 @@ Validated local image ID: `sha256:9eec4fafe6f5d973af6e4c6f190238afc85651852a2383
 The application has not been deployed to a public/organizational hostname. The infrastructure team must supply the domain and TLS, name the account recovery contact, schedule protected off-host backups, and run a restore drill on its storage. External SSO, email delivery, real-device labs and live classes are not part of this release.
 
 No physical mobile device, headset, large concurrent class, or independent penetration test was used. Chromium ran headlessly with software WebGL. The campus used its low-quality setting. Vite reports the inherited Three.js chunk above 500 kB; course/campus code is loaded separately from onboarding, but further device performance work remains.
+
+## Optional placement and published demo
+
+The release follow-up removes placement prerequisites from both navigation and the 3D engine. Classroom, laboratory and all five lessons open before assessment; skipping preserves a null placement result. The F5 assessment is also optional.
+
+- Local validation: typecheck, unit checks, product build, separate static demo build, 14 campus browser scenarios and 12 F5 scenarios against the account-free demo passed. The demo passed mobile portrait/landscape, report export, persisted progress, disabled WebGL and denied storage scenarios.
+- [GitHub Actions run 38722113927](https://github.com/S00rin/Soovers/actions/runs/38722113927) passed on source commit `db55de1`, including all API/browser suites, a fresh Docker build, and container persistence/recovery checks.
+- The GitHub `demo` branch contains only the static preview. Its learning state stays in the browser; account-backed persistence runs in the Docker product.

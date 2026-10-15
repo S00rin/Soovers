@@ -15,7 +15,7 @@ const server=http.createServer(async(req,res)=>{
  if(!['GET','HEAD'].includes(req.method||''))return send(405,'Method not allowed',{'Allow':'GET, HEAD'});
  try{
   let pathname=decodeURIComponent(new URL(req.url,'http://localhost').pathname);
-  if(pathname==='/healthz')return send(200,JSON.stringify({status:'ok',app:'SooVers',version:'0.5.0'}),{'Content-Type':'application/json'});
+  if(pathname==='/healthz')return send(200,JSON.stringify({status:'ok',app:'SooVers',version:'1.0.0'}),{'Content-Type':'application/json'});
   if(base!=='/'){if(pathname===base)return send(308,'',{'Location':base+'/'});if(!pathname.startsWith(base+'/'))return send(404,'Not found');pathname=pathname.slice(base.length);}
   if(pathname.split('/').some(p=>p.startsWith('.')||p.includes('\\'))||pathname.includes('\0'))return send(404,'Not found');
   let file=path.resolve(root,'.'+pathname);if(file!==root&&!file.startsWith(root+path.sep))return send(404,'Not found');
@@ -26,7 +26,7 @@ const server=http.createServer(async(req,res)=>{
 server.on('error',error=>{console.error(error.code==='EADDRINUSE'?`Port ${port} is in use. Close the other SooVers window or run: node run.mjs --port 8081 --open`:error.message);process.exitCode=1;});
 server.listen(port,host,()=>{
  const url=`http://${host}:${port}${base==='/'?'/':base+'/'}`;
- console.log(`SooVers 0.5 · ${url} · ${root}\nKeep this window open. Press Ctrl+C to stop.`);
+ console.log(`SooVers Academy 1.0 · ${url} · ${root}\nKeep this window open. Press Ctrl+C to stop.`);
  if(args.includes('--open')&&process.platform==='win32'){
   // Open only the local URL after the server has successfully bound its port.
   const opener=spawn('rundll32.exe',['url.dll,FileProtocolHandler',url],{windowsHide:true,stdio:'ignore'});

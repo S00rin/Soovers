@@ -28,6 +28,9 @@ Vite proxies `/api` to the application server. Restart the API process after ser
 
 ## Interactive demo
 
+- [Open the hosted interactive demo](https://soovers-academy-demo.nutmegtern65.chatgpt.site) — private preview for the owning ChatGPT account; Sites may ask you to sign in. No academy account is needed.
+- [Download the portable demo](https://github.com/S00rin/Soovers/releases/tag/v1.0.0) — extract and run `node run.mjs` with Node 24+, or use `START_WINDOWS.bat`. No dependency installation is needed to run the built preview.
+
 `pnpm build:demo` creates a static, account-free preview in `demo-dist/`. The optional GitHub Pages workflow can publish that preview after Pages is enabled in the repository settings. A separately published `demo` branch contains the ready-to-serve static build. The full application and its account API remain in the Docker deployment.
 
 Placement and assessments are optional. Learners can enter the classroom, laboratory and every lesson without taking a placement test. Skipping does not create an assessment result; the test remains available for personalized suggestions.
