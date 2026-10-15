@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "SooVers | جهان در حال شکل‌گیری",
-  description: "SooVers؛ دموی تعاملی لابی و طبقهٔ آموزش امنیت سایبری، با کلاس، تخته و تمرین‌های سه‌بعدی.",
+  title: "SooVers | آکادمی کنترل صنعتی",
+  description: "آموزش تعاملی کنترل صنعتی، فرایند، اندازه‌گیری و شواهد OT.",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",

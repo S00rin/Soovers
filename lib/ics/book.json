@@ -1,0 +1,2286 @@
+{
+  "title": "Industrial Automation — Book B, Student Release 2",
+  "date": "2026-10-15",
+  "sections": {
+    "1.1": {
+      "title": "1.1 The industrial problem: keep water available without losing control of the level",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "A small utility system receives water into a tank. Another part of the facility needs water from that tank. An outlet pump transfers the water onward. Sometimes water enters faster than it leaves; sometimes demand and supply do not match. Someone must know how much water is present, decide what the pump should do and notice when the expected response does not occur."
+        },
+        {
+          "type": "paragraph",
+          "text": "Begin with the process, not the computer. The operational objective in this fictional example is to keep the tank level near 2.0 metres while allowing useful flow through the system. The equipment is a vertical tank, an incoming pipe, an outlet pipe and an adjustable-speed pump. The automated system will measure level and adjust the outlet pumping rate. The operator will see the measurement, the target and the pump command."
+        },
+        {
+          "type": "paragraph",
+          "text": "The tank is labelled T-101 and the pump P-101. These are equipment identifiers, not network addresses. The same equipment can appear on an engineering drawing, an operator display and a maintenance record. Good records allow people to recognize that these references concern the same physical object. Our tag choices are fictional conventions; real tag interpretation starts with the site's identification rules. [R10] [R33]"
+        },
+        {
+          "type": "paragraph",
+          "text": "The simple picture already contains several different responsibilities. The process engineer asks what flow and inventory the process requires. The instrumentation engineer asks how level will be measured. The control engineer asks how pumping should respond. The operator asks whether the plant is behaving normally and whether action is needed. The security analyst asks whether information or commands are trustworthy and who changed them. These questions interact, but one profession's experience does not automatically answer the others."
+        },
+        {
+          "type": "paragraph",
+          "text": "An everyday analogy is a bathtub with a tap and a drain. If the tap adds more water than the drain removes, the level rises. The analogy stops being sufficient when we need exact quantities, automatic control, instrument faults, energy, approved operating limits and responsibility for action. Industrial reasoning begins when those details are made explicit."
+        },
+        {
+          "type": "paragraph",
+          "text": "The fictional tank contains clean water at atmospheric pressure. We assume a constant horizontal cross-sectional area of 2.0 square metres and an instrument span from 0 to 4.0 metres. The pump is represented by a deliberately simple relationship: 0% command gives 0 litres per second and 100% gives 20 litres per second. This linear, instantaneous pump model is a teaching assumption. It is not a pump curve and does not represent head, friction, cavitation, motor dynamics or a real variable-frequency drive."
+        }
+      ]
+    },
+    "1.2": {
+      "title": "1.2 Water level is the consequence of a balance",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "The most useful first question is not “what does the dashboard show?” It is “what physical behavior should these flows produce?” Let h be the water level in metres and A the constant cross-sectional area in square metres. The water volume is V = A × h, measured in cubic metres. This relationship works for the ideal vertical, constant-area tank; it does not describe every vessel shape."
+        },
+        {
+          "type": "paragraph",
+          "text": "One cubic metre is 1,000 litres. Therefore, an inflow of 10 litres per second is 0.010 cubic metres per second. If the outflow is also 10 litres per second, the volume does not change. Water is still moving through the tank, but its stored quantity remains constant. A flat level trend is not evidence that there is no process activity."
+        },
+        {
+          "type": "paragraph",
+          "text": "For a short interval over which flows can be treated as constant:"
+        },
+        {
+          "type": "paragraph",
+          "text": "Change in volume = (inflow - outflow) × elapsed timeChange in level  = change in volume / tank areah_next = h_now + ((q_in - q_out) / A) × Δt"
+        },
+        {
+          "type": "paragraph",
+          "text": "In the last equation, both flows must use cubic metres per second. Mixing litres per second with square metres would introduce a factor-of-1,000 error. Writing units is not decoration: it is a quick way to catch a wrong calculation before interpreting it as unusual behavior."
+        },
+        {
+          "type": "paragraph",
+          "text": "Consider a level of 2.5 m, an inflow of 10 L/s and an outflow of 18 L/s. Over 10 seconds the tank loses 80 litres, or 0.080 m³. Dividing by 2.0 m² gives a level decrease of 0.040 m. The new level is 2.46 m. These numbers are derived from our stated assumptions, not observed at a facility."
+        },
+        {
+          "type": "paragraph",
+          "text": "A useful reverse calculation is also possible. If this same tank rises by 0.30 m in one minute, its stored volume has increased by 0.60 m³, or 600 litres. The average net inflow was therefore 10 L/s. That does not tell us the individual inflow and outflow: 10 in and 0 out, 20 in and 10 out, and 50 in and 40 out would produce the same level change. A level trend alone does not uniquely identify the cause."
+        },
+        {
+          "type": "paragraph",
+          "text": "Our tank is an example of a continuous process: material can flow while control continues. A batch process deliberately handles a bounded quantity through steps such as fill, mix, hold and empty. A discrete process handles countable items or operations, such as moving a package to a station. These descriptions concern how the process operates; a continuous process can still contain discrete start/stop commands, and a batch system can use continuously varying temperature or level measurements."
+        },
+        {
+          "type": "paragraph",
+          "text": "For this model, a simple physical consistency check is available: measured level movement should broadly agree with the flow balance over the same interval. In a real process, that comparison would require trustworthy flow measurements, compatible timestamps, appropriate vessel geometry and allowance for unmodelled effects. A disagreement is a reason to investigate the assumptions and evidence; it is not automatically proof of a cyberattack."
+        }
+      ]
+    },
+    "1.3": {
+      "title": "1.3 The control chain has more than one kind of connection",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "The complete chain is physical process → measurement → electrical signal → input conversion → controller logic → output signal → drive/pump → process response. The operator display and historical record observe parts of that chain. They are not the water, and they are not necessarily the place where the immediate control decision is executed."
+        },
+        {
+          "type": "paragraph",
+          "text": "A sensor responds to a physical property. A transmitter converts the measurement into a usable signal or communicates the measured value. An input module brings that signal into a controller. A controller executes the decision logic. An output module sends the resulting command toward the device that changes the process. An actuator converts a command and available energy into physical action. These roles may be packaged together in one device, but keeping them conceptually separate makes faults easier to locate. A 4-20 mA transmitter and an input channel provide a concrete example of such a measurement interface. [R14] [R15]"
+        },
+        {
+          "type": "paragraph",
+          "text": "For this chapter, the controller is called a programmable logic controller, or PLC. Its program reads a level value and computes an outlet-pump command. A human-machine interface, or HMI, is the operator-facing display and interaction layer. A historian is a system that stores time-related process information. These names describe roles in the fictional architecture; later chapters explain how a distributed control system or a larger SCADA environment organizes overlapping functions. [R01]"
+        },
+        {
+          "type": "paragraph",
+          "text": "Notice what the drawing does not imply. The current loop from the transmitter is not an Ethernet connection. The electrical output to a drive is not the pipe that carries water. The operator display can report a command even when the actuator has not carried it out. The historian may receive a copy of information rather than an independent measurement of the process."
+        },
+        {
+          "type": "paragraph",
+          "text": "This separation is especially valuable to an IT practitioner. A network diagram might show the PLC and HMI communicating successfully while omitting a disconnected instrument wire. Conversely, the local controller might continue operating correctly while the HMI loses updates. The digital connection is important, but it is only one part of the operational chain."
+        }
+      ]
+    },
+    "1.4": {
+      "title": "1.4 Measurement: the real level and its representation",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Assume the tank's level transmitter, LT-101, measures the height of water. Here “LT” is our level-transmitter tag convention, not a claim that the letters identify every technology inside the device. A real level instrument may use a different physical principle from another instrument with a similar tag. Its installation, calibration, range and operating conditions determine what its reported value means. Site drawings and instrument documentation resolve that meaning. [R10] [R33]"
+        },
+        {
+          "type": "paragraph",
+          "text": "In this chapter's ideal measurement, 0.0 m corresponds to the bottom of the measurement span and 4.0 m to the top. This span is not an approved operating range. A transmitter capable of measuring 4.0 m does not establish that operating at 3.9 m is acceptable, nor that the vessel can safely contain every fluid up to that point."
+        },
+        {
+          "type": "paragraph",
+          "text": "A measurement needs at least four questions answered: What quantity is being measured? In what units? Over what range? With what validity and time context? A bare value of “75” could be percent of level span, centimetres, a raw input code or a pressure reading. Confusing these representations can produce a very convincing but wrong operator graphic."
+        },
+        {
+          "type": "paragraph",
+          "text": "A real instrument also has limitations. A value can be biased, noisy, delayed, out of range or frozen. A quality flag may indicate a detected device or communication problem, but a plausible in-range value can still be wrong. The synthetic stuck-sensor exercise later in this chapter deliberately demonstrates that last case: the signal remains 12 mA while the physical model's water level changes."
+        },
+        {
+          "type": "paragraph",
+          "text": "There is an important distinction between calibration and plausibility. Calibration concerns the relationship between a known reference and the instrument's indication under specified conditions. A plausibility check asks whether the data make sense in the current context. A physically plausible number is not necessarily calibrated; a recently calibrated instrument can still suffer a later wiring, configuration or communication fault. This release does not prescribe field calibration procedures."
+        }
+      ]
+    },
+    "1.5": {
+      "title": "1.5 From 4-20 mA to engineering units",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "A milliampere, written mA, is one-thousandth of an ampere. Current is the rate of electric charge flow. In a conventional 4-20 mA measurement loop, the transmitter regulates current to represent a measurement across a defined range. The receiver measures that current and converts it into a value the control system can use. The lower endpoint is 4 mA rather than zero; this is commonly called a live zero. [R14] [R15]"
+        },
+        {
+          "type": "paragraph",
+          "text": "In our fictional range, 4 mA means 0 m and 20 mA means 4 m. The signal span is 16 mA. The level span is 4 m. We first find the fraction of the signal span, then apply that fraction to the engineering span:"
+        },
+        {
+          "type": "paragraph",
+          "text": "Fraction of span = (measured current - 4 mA) / 16 mALevel in metres  = fraction of span × 4 m"
+        },
+        {
+          "type": "paragraph",
+          "text": "At 10 mA, the fraction is (10 - 4) / 16 = 0.375. The level is 0.375 × 4 = 1.5 m. At 12 mA the level is 2.0 m; at 14 mA it is 2.5 m. The conversion is not a vendor feature: it is arithmetic applied to the assumed linear transmitter range."
+        },
+        {
+          "type": "paragraph",
+          "text": "The general linear equation is:"
+        },
+        {
+          "type": "paragraph",
+          "text": "Engineering value = LRV +  [(signal - signal_low) / (signal_high - signal_low)]  × (URV - LRV)LRV = lower range value; URV = upper range value."
+        },
+        {
+          "type": "paragraph",
+          "text": "A transmitter configured for -1 to +3 m would have a different lower range value even if it used the same 4-20 mA signal. A receiver configured for the wrong span can display believable numbers that disagree systematically with the actual quantity. Always compare both ends of the mapping, not just the signal type."
+        },
+        {
+          "type": "paragraph",
+          "text": "A break or loss of power can produce a low or absent current rather than a valid zero-level reading. In a conventional loop, 0 mA is not the normal 0% endpoint. However, an exact diagnostic interpretation depends on the hardware, wiring, transmitter settings and input-module behavior. It would be wrong to turn “0 mA” into a universal diagnosis of one particular fault. [R15] [R34]"
+        },
+        {
+          "type": "paragraph",
+          "text": "The naïve formula maps 0 mA to -1.0 m in our example. That is a mathematical extrapolation, not evidence that the tank contains negative water. The supplied educational function rejects values outside 4-20 mA and rejects a non-GOOD quality input. This intentionally simple rule is not an implementation of NAMUR NE 43 and should not be substituted for a manufacturer's diagnostic ranges."
+        },
+        {
+          "type": "paragraph",
+          "text": "The drawing represents a conceptual current loop, not a field wiring instruction. A two-wire transmitter can take operating power from the loop while regulating the signal current. The receiver, transmitter and wiring must fit the available voltage budget. For an illustrative calculation, a 250-ohm receiver burden at 20 mA drops 5 V because voltage equals current multiplied by resistance. If a transmitter requires 12 V and an assumed wire resistance causes another 2 V drop, a 24 V supply leaves 5 V of margin. Those assumptions are not specifications for a real device. Manufacturer design limits must be checked before any physical work. [R14]"
+        },
+        {
+          "type": "paragraph",
+          "text": "A 4-20 mA loop carries a changing electrical signal; it should not be described as a stream of ordinary IP packets. Some smart instruments add a digital communication overlay, such as HART, without making the analog value an Ethernet packet. The protocol chapter will separate those layers. [R15]"
+        }
+      ]
+    },
+    "1.6": {
+      "title": "1.6 I/O: what crosses the controller boundary?",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "I/O means input/output. An input brings information toward the controller. An output carries a controller command outward. “Input” and “output” are relative to the device being described: a signal can leave an instrument and enter a PLC. Do not label direction simply by whether an arrow points left or right on a drawing."
+        },
+        {
+          "type": "paragraph",
+          "text": "Four useful categories are digital input (DI), digital output (DO), analog input (AI) and analog output (AO). In this teaching model, a DI is a two-state indication, such as an assumed drive-available contact. A DO is a two-state command, such as an enable request. An AI represents a varying measured quantity, such as 4-20 mA level. An AO represents a varying command, such as a pump-speed reference. Actual modules have electrical ratings, isolation, diagnostics and configuration requirements that cannot be inferred from these four labels."
+        },
+        {
+          "type": "paragraph",
+          "text": "An analog signal being converted to a binary number does not turn the physical measurement into a DI. The categories describe the channel's role and signal interface, not whether the processor ultimately stores bits. Likewise, a digital output commanding a relay does not supply the power needed by a large motor."
+        },
+        {
+          "type": "paragraph",
+          "text": "Table 5. Illustrative signal list. Only the numerical level/control path is simulated."
+        },
+        {
+          "type": "table",
+          "rows": [
+            [
+              "Signal",
+              "Type",
+              "Representation",
+              "Interpretation boundary"
+            ],
+            [
+              "LT-101 level",
+              "AI",
+              "4–20 mA → 0–4 m",
+              "Represents measured level, not guaranteed physical truth."
+            ],
+            [
+              "P-101 speed reference",
+              "AO",
+              "Illustrative 0–100% request",
+              "Possible drive interface; not physically implemented in the model."
+            ],
+            [
+              "Drive available",
+              "DI",
+              "Available / unavailable",
+              "Possible permission/status input; does not prove flow."
+            ],
+            [
+              "Pump enable",
+              "DO",
+              "Enable / disable request",
+              "Logic request, not the motor power circuit."
+            ],
+            [
+              "Run feedback",
+              "DI",
+              "Running / not running claim",
+              "Status evidence; not independent proof of water movement."
+            ]
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "A real I/O list should add the rack/module/channel, terminal or interface reference, signal type, units, scaling, normal state, diagnostic behavior, destination tag and document revision. Our list deliberately does not invent Siemens, ABB or MAPCS channel addresses. The purpose is to learn what a mapping must describe before learning a product's address syntax."
+        },
+        {
+          "type": "paragraph",
+          "text": "The pump command, a drive-running indication and measured water flow are three different observations. A command says what was requested. A running contact reports a particular device condition. A flow measurement says something about material movement, subject to its own limitations. None should silently be substituted for the others. In the model, outflow follows command perfectly only because we explicitly assumed that relationship."
+        }
+      ]
+    },
+    "1.7": {
+      "title": "1.7 Closed-loop control: act on the difference, then measure again",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "The process variable, or PV, is the quantity being controlled: water level in this example. The setpoint, or SP, is the desired value: 2.0 m. The manipulated variable is the quantity adjusted to influence the process; here it is the outlet pumping command, which the idealized pump converts into outflow. A disturbance is an external change that affects the process, such as a change in incoming water flow. These terms provide the vocabulary for feedback control. [R16]"
+        },
+        {
+          "type": "paragraph",
+          "text": "In open-loop operation, we might set the pump to 50% and leave it there. Under our assumptions that removes 10 L/s. If inflow remains 10 L/s, level stays constant. If inflow changes, the command does not correct itself. Open-loop does not mean that the network is disconnected; it means that the action is not being adjusted using feedback from the controlled quantity."
+        },
+        {
+          "type": "paragraph",
+          "text": "In closed-loop operation, the controller repeatedly compares measured level with the target and changes its output in response. When the measurement and action are correctly related, the effect should oppose the unwanted deviation. The controller then measures again because the process response takes time."
+        },
+        {
+          "type": "paragraph",
+          "text": "Direction is crucial. Our pump removes water from the tank. Therefore a level above target should increase pumping. A pump feeding the tank would require a different directional relationship. The phrase “increase the pump when level is low” cannot be memorized independently of the piping arrangement."
+        },
+        {
+          "type": "paragraph",
+          "text": "For the outlet-pump model we define the error as e = PV - SP, and use this original proportional-control rule:"
+        },
+        {
+          "type": "paragraph",
+          "text": "e [m] = measured_level [m] - setpoint [m]u [% command] = 50 + 80 × eLimit u to the interval 0 to 100."
+        },
+        {
+          "type": "paragraph",
+          "text": "Here 50 is the nominal command that balances 10 L/s inflow. The proportional gain is 80 percentage points per metre. A percentage point is an absolute movement on the 0-100% command scale: moving from 50% to 70% is a 20-percentage-point increase."
+        },
+        {
+          "type": "paragraph",
+          "text": "At a measured level of 2.5 m, the error is +0.5 m. The requested command is 50 + 80 × 0.5 = 90%. Our ideal pump then removes 18 L/s. With 10 L/s entering, level decreases. At 1.5 m, the error is -0.5 m and command becomes 10%, removing only 2 L/s, so level increases. The direction is consistent in both cases."
+        },
+        {
+          "type": "paragraph",
+          "text": "Many references write error as SP - PV instead. That is not a contradiction. The controller action or sign of the gain must be consistent with the chosen error convention and the process. Replacing one convention without changing the rest can turn correction into reinforcement. The textbook uses the explicit PV - SP convention for this outlet pump to make the causal direction easy to inspect."
+        },
+        {
+          "type": "paragraph",
+          "text": "The numerical gain is for this educational model only. A real gain must account for the actual process response, delays, actuator limits, measurement quality, interaction with other loops and approved tuning practice. This chapter teaches why a controller acts; it does not provide a recipe for tuning an operational plant."
+        }
+      ]
+    },
+    "1.8": {
+      "title": "1.8 Why proportional control is not the whole story",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Suppose the tank starts at 2.0 m with 10 L/s entering and leaving. At 300 seconds, incoming flow increases to 14 L/s. At the instant of the change, the measured level is still 2.0 m, so the proportional rule still commands 50%. Water begins to accumulate. As level rises, the output increases and more water leaves."
+        },
+        {
+          "type": "paragraph",
+          "text": "To balance 14 L/s, the ideal pump requires 70% command. Under the proportional rule, 70 = 50 + 80 × e, so e must be 0.25 m. The new equilibrium is therefore 2.25 m, not 2.0 m. This residual error is not a broken controller. It follows from the unchanged bias and the proportional-only rule under the new disturbance."
+        },
+        {
+          "type": "paragraph",
+          "text": "The supplied discrete-time model reaches approximately 2.249819 m at 1,200 seconds. The exact proportional-only recurrence after the disturbance is known for our model, and one of the executed tests compares the simulation against that recurrence. The result does not establish that every real level loop exhibits the same offset or timing."
+        },
+        {
+          "type": "paragraph",
+          "text": "Integral action adds a contribution based on accumulated error over time. An everyday analogy is someone noticing not only that the tank is high now, but that it has remained high for a while, and gradually changing the baseline effort. That analogy is limited: the controller is not making a judgment; it is applying a numerical rule. The important idea is that accumulated contribution can remain nonzero even after the current error approaches zero. [R16]"
+        },
+        {
+          "type": "paragraph",
+          "text": "In the supplied proportional-integral (PI) model, each one-second step updates an integral contribution using 0.4 × error × elapsed time, with units chosen to produce percentage points. The total command combines the 50% bias, proportional contribution and integral contribution. This additional term allows an output near 70% while the level returns toward the 2.0 m target."
+        },
+        {
+          "type": "paragraph",
+          "text": "At the end of the provided 1,200-second run, the PI-model level is 1.989462 m. It has not reached exactly 2.0 m; it is still settling. The distinction matters: a plot that looks close to target should not be described as mathematically exact convergence or physical validation. The model also overshoots and then corrects. Whether that response is acceptable is a separate design question."
+        },
+        {
+          "type": "paragraph",
+          "text": "Derivative action responds to how quickly a signal is changing. It can be introduced as attention to the trend rather than only the present difference. Noise and abrupt changes complicate that idea, so “derivative predicts the future” is an overly strong explanation. Detailed derivative implementations and filtering are reserved for Chapter 4; the supplied model uses PI, not PID. [R16]"
+        },
+        {
+          "type": "paragraph",
+          "text": "An output cannot increase forever. A command is limited to 0-100% in this model. If an integral term continues accumulating while the actuator is already at its limit, it can delay recovery when the error reverses. The source code includes a simple conditional-integration guard to avoid integrating farther into saturation. That is an educational algorithm, not a claim to duplicate a vendor's anti-windup implementation."
+        }
+      ]
+    },
+    "1.9": {
+      "title": "1.9 A PLC is not an HMI that happens to have outputs",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "In the fictional architecture, the PLC performs the repeated control calculation. The HMI displays selected values and accepts permitted operator requests. Losing the HMI display is therefore different from stopping the controller program. Whether a real control function can continue after a particular server or network failure depends on the actual design; the separation must be verified, not assumed."
+        },
+        {
+          "type": "paragraph",
+          "text": "A useful beginner model is acquire inputs, execute logic, update outputs, and repeat. It explains why a controller acts on sampled information and why changes can take a finite time to appear. However, that phrase is not a universal exact order for every PLC. Siemens' S7-1200 G2 documentation describes process images, tasks and I/O-update behavior; the actual execution model includes details beyond a three-box loop. [R17]"
+        },
+        {
+          "type": "paragraph",
+          "text": "A process image is a controller memory representation associated with inputs and outputs. It allows a program to work with a set of values rather than continuously rereading every physical signal during each instruction. Different tasks, direct accesses, distributed I/O and product-specific behavior can complicate the simple picture. We will use the simple picture only where its assumptions are adequate. [R17]"
+        },
+        {
+          "type": "paragraph",
+          "text": "Do not confuse the Python model's one-second integration step with an actual PLC scan time. They solve different problems. The script advances a mathematical process model and controller rule. It does not reproduce a vendor scheduler, I/O bus, interrupt system or communication stack."
+        },
+        {
+          "type": "paragraph",
+          "text": "Similarly, the HMI update interval and historian recording interval need not match the controller's execution interval. In an authored timing example, a controller may evaluate a condition several times between two display updates. A brief event could therefore appear in a controller or sequence-of-events record but not in a slowly sampled trend. Before declaring a missing event suspicious, establish what each source was capable of recording."
+        }
+      ]
+    },
+    "1.10": {
+      "title": "1.10 Three values: physical truth, controller measurement and operator display",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "The model gives us a privilege that a real investigation rarely provides directly: we can inspect the simulated physical level independently of the measurement and the display. We call it truth_level_m solely because the simulation computes it. It is not a magic field available from every industrial platform."
+        },
+        {
+          "type": "paragraph",
+          "text": "The controller uses controller_level_m. The operator sees hmi_level_m. In the normal model these values agree. In the stuck-sensor scenario, the physical level rises to 3.8 m while both the controller and display remain at 2.0 m. In the stale-HMI scenario, the controller continues its PI response while the display remains at 2.0 m. These are different fault locations even though an operator might initially describe both as “the level is stuck.”"
+        },
+        {
+          "type": "paragraph",
+          "text": "A realistic evidence record should identify value, units, quality meaning, time of measurement or source update where available, and time of collection. The synthetic file separately records HMI sample age. It does not pretend that those names are native fields from Siemens, ABB, MAPCS, Zeek, an OPC server or Splunk CIM."
+        },
+        {
+          "type": "paragraph",
+          "text": "A device or integration layer may label a value GOOD because no fault has been detected by its own checks. That statement is narrower than “the physical measurement is true.” In the synthetic sensor fault, a plausible 12 mA value passes the range check. This is why an in-range check, an authenticated network connection and a familiar dashboard color answer different questions."
+        },
+        {
+          "type": "paragraph",
+          "text": "The display-age check is also intentionally limited. A stable numerical value is not automatically stale: the water could genuinely be at a constant level. Staleness concerns the age or continuity of the update, not merely whether the number changed. Our model flags STALE after more than five seconds without a fresh display sample, but that threshold is an authored exercise setting, not a general industrial requirement."
+        }
+      ]
+    },
+    "1.11": {
+      "title": "1.11 Commands, modes, alarms and protective functions",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "An operator in manual mode directly selects an output within whatever restrictions the engineered application provides. In automatic mode, the controller calculates output using its control rule. Manual mode does not necessarily remove alarms, permissives, interlocks or protective functions. The behavior is defined by the actual program and operating philosophy, not by the word “manual.”"
+        },
+        {
+          "type": "paragraph",
+          "text": "Moving between modes creates another question: will the commanded output jump? A transition designed to avoid an abrupt output discontinuity is often described as bumpless transfer. This chapter introduces the objective; the supplied model does not implement manual/automatic transitions, tracking logic or vendor mode-management blocks."
+        },
+        {
+          "type": "paragraph",
+          "text": "An alarm calls attention to a condition requiring a defined response. A permissive is a condition that must be satisfied before an action is allowed. An interlock is a logical relationship that inhibits or enforces behavior under specified conditions. A trip is a protective action or state used to move equipment or a process toward an intended condition. The precise terms and their implementation vary by application, so the cause-and-effect documentation must define what actually happens."
+        },
+        {
+          "type": "paragraph",
+          "text": "For a fictional start request, the designer might require an available drive and an approved operating mode before allowing the pump to start. This illustrates a permissive, not a complete motor-control design. If the run feedback does not agree with the command, a diagnostic alarm could draw attention to that disagreement. Neither statement proves that water is moving."
+        },
+        {
+          "type": "paragraph",
+          "text": "Normal process control and safety protection must not be treated as synonyms. A basic process control system (BPCS) performs ordinary process operation. A safety instrumented system (SIS) implements specified safety instrumented functions (SIFs) within a managed lifecycle. Adding a high-level comparison to a normal PLC program does not by itself establish a qualified SIS or a required degree of independence. IEC 61511 addresses the process-sector SIS lifecycle; this book does not confer design or approval authority. [R08]"
+        },
+        {
+          "type": "paragraph",
+          "text": "Safety Integrity Level (SIL) and ISA/IEC 62443 security level are different concepts. A SIL concerns the integrity required of a safety function in its applicable functional-safety framework. A security level concerns cybersecurity requirements/capability in the relevant 62443 context. Neither is a universal label meaning “this whole site is safe.” Cybersecurity also matters to normal control and instrumented safety because those systems may initiate or protect against hazardous conditions. [R07] [R06] [R31]"
+        },
+        {
+          "type": "paragraph",
+          "text": "No high-high trip setpoint, shutdown voting arrangement, safety bypass or real protective logic is specified in this model. Its water-level ceiling is a mathematical boundary. The source code stops with an error if an unhandled physical boundary is reached rather than quietly claiming to model overflow or dry-running. The control and measurement exercises do not validate protection."
+        }
+      ]
+    },
+    "1.12": {
+      "title": "1.12 One response traced end to end",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Return to the 2.5 m starting level, 2.0 m target and 10 L/s inflow. Assume a valid measurement and the proportional-only rule. The following calculation holds the initial command for one illustrative one-second interval. It is an authored trace, not an instrument or network capture."
+        },
+        {
+          "type": "paragraph",
+          "text": "First the physical level is 2.5 m. The ideal transmitter represents it as 14 mA. The receiver scales 14 mA back to 2.5 m. The controller computes error +0.5 m and command 90%. The ideal pump removes 18 L/s. The tank loses 8 litres in one second, so level falls by 0.004 m to 2.496 m."
+        },
+        {
+          "type": "paragraph",
+          "text": "On the next evaluation, the ideal transmitter produces 13.984 mA. The controller calculates 89.68%, giving an ideal outflow of 17.936 L/s. The next level change is approximately -0.003968 m. The level response gradually changes the next command. That repeated causal cycle is the feedback loop."
+        },
+        {
+          "type": "paragraph",
+          "text": "Physical quantity:       2.500000 mTransmitter current:    14.000000 mAController level:        2.500000 mSetpoint:                2.000000 mError (PV - SP):         0.500000 mPump command:           90.000000 %Ideal outflow:          18.000000 L/sInflow:                 10.000000 L/sLevel after 1 second:    2.496000 m"
+        },
+        {
+          "type": "paragraph",
+          "text": "The HMI can display level, target and command, but a screenshot alone does not prove that the command reached the drive or that the pump moved water. A historian can retain a trend, but a retained trend may originate from the same transmitter that feeds the controller. A network observation can help establish communication, but it does not independently measure the water. The same event should be described differently depending on which evidence is actually available."
+        },
+        {
+          "type": "paragraph",
+          "text": "An end-to-end explanation is complete only when it closes the loop: the action changes the physical process, the measurement changes, and the next control decision responds. Stopping the explanation at “the PLC writes 90” misses the most important part of industrial control."
+        }
+      ]
+    },
+    "1.13": {
+      "title": "1.13 Troubleshooting: locate the disagreement before naming the cause",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Suppose the operator says, “The trend is flat, but something feels wrong.” A useful first response is to establish exactly which trend, timestamp, units and source the operator is referring to. Compare available evidence through an approved process. Do not begin by reconnecting cables, changing modes, rebooting a controller or sending test commands to a live system."
+        },
+        {
+          "type": "paragraph",
+          "text": "There are at least four places to locate the disagreement. The process may be behaving differently from its assumed inflow/outflow conditions. The measurement path may not represent the process correctly. The command/actuation path may not produce the expected physical action. The display or historical path may not represent fresh controller data. More than one fault can exist at once."
+        },
+        {
+          "type": "paragraph",
+          "text": "Case A: level is constant and measured inflow approximately equals measured outflow. That is consistent with a steady inventory. More evidence is needed before treating the lack of change as a fault. Even a constant level can coexist with significant material movement."
+        },
+        {
+          "type": "paragraph",
+          "text": "Case B: controller level changes while the HMI's last-update time remains old. This supports investigating the display/integration path. It does not justify replacing the level transmitter merely because the visible screen is stuck. The stale-HMI simulation is an example of this pattern."
+        },
+        {
+          "type": "paragraph",
+          "text": "Case C: the controller sees a plausible constant value, but an approved independent indication and the flow balance suggest accumulation. This supports investigating measurement validity, scaling, the sensing installation and relevant configuration history. The synthetic stuck-sensor scenario fits this pattern, but a similar observation in a plant would not determine whether the cause was accidental or malicious."
+        },
+        {
+          "type": "paragraph",
+          "text": "Case D: command is high, run feedback is present, and measured outlet flow is low. The command has not been shown to produce the assumed process response. Possible explanations involve the motor/drive, pump, flow path, instrumentation or model assumptions. A security analyst should preserve relevant evidence and coordinate with qualified operations and maintenance personnel rather than experiment with the equipment."
+        },
+        {
+          "type": "paragraph",
+          "text": "A practical evidence note separates observations, interpretations and open questions. “HMI sample age is 900 seconds” is an observation in the supplied model. “The HMI update path is stale” is a supported interpretation because that field has an explicit definition. “An attacker changed the controller” is unsupported unless additional evidence establishes such activity."
+        },
+        {
+          "type": "paragraph",
+          "text": "A second practical lesson is source independence. Two dashboards using the same controller tag are not two independent measurements. A historian and a SIEM may repeat the same upstream error. Stronger corroboration can require different measurement principles, sources or approved physical checks, each with known limitations. Choosing those checks is an engineering and operational decision."
+        }
+      ]
+    },
+    "1.14": {
+      "title": "1.14 The security meaning of a control loop",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "The security question is not merely whether a PLC is reachable. It is whether the people and systems responsible for the process can obtain sufficiently trustworthy information, make authorized decisions and cause the intended actions within the system's operating constraints. OT security must account for physical interaction, reliability and safety, rather than simply transplanting enterprise response defaults. [R01]"
+        },
+        {
+          "type": "paragraph",
+          "text": "For the fictional outlet-pump system, a falsely low measurement can lead the controller to remove less water than the actual level requires. A false display can mislead the operator even while the local control loop continues functioning. An unauthorized setpoint change alters the target; an unauthorized scaling change alters the meaning of the feedback. These statements describe consequences within the fictional model, not instructions for manipulating industrial equipment."
+        },
+        {
+          "type": "paragraph",
+          "text": "A defender should therefore understand the tag, the measurement range, the control direction, the current mode, the actual execution location and the meaning of command/feedback evidence. Without that context, a technically accurate network alert can still lead to the wrong operational conclusion."
+        },
+        {
+          "type": "paragraph",
+          "text": "The first monitoring design for this process would ask for approved access to relevant controller/engineering change records, HMI events, historian values with their quality and time semantics, drive diagnostics, asset metadata and network observations where available. It would document what each source can establish and who owns it. This is a collection-requirements exercise, not an assertion that every product exports the same logs."
+        },
+        {
+          "type": "paragraph",
+          "text": "An automatic response should not be chosen from the name of an alert alone. Stopping the outlet pump, for example, changes the water balance. Whether that is acceptable depends on current process conditions and engineered protection. In a real industrial incident, the operations and engineering teams must assess such consequences and authorize the response within the site's procedures. [R31]"
+        },
+        {
+          "type": "paragraph",
+          "text": "The correct initial learning habit is to explain the normal chain first, identify the observed disagreement second, and form a cyber hypothesis only when the evidence supports it. This habit does not dismiss malicious activity. It makes the investigation more accurate and the proposed response more defensible."
+        }
+      ]
+    },
+    "1.15": {
+      "title": "1.15 Laboratory 1: scaling and the meaning of a valid value",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Classification: offline analysis. Objective: translate a linear signal into engineering units, check the assumptions behind the conversion and distinguish a numerical result from a valid measurement. Prerequisites: Sections 1.2, 1.5 and 1.6; arithmetic with decimals. Environment: this book, paper or a calculator, and no connection to industrial equipment. The topology is simply a set of fictional transmitter values interpreted by the learner."
+        },
+        {
+          "type": "paragraph",
+          "text": "Step 1. Write the assumed transmitter range, 0-4 m, and current range, 4-20 mA, at the top of the worksheet. Record the two spans separately. Explain why the denominator in the fraction-of-span calculation is 16 rather than 20."
+        },
+        {
+          "type": "paragraph",
+          "text": "Step 2. Reproduce the worked 10 mA conversion and check both endpoints. Expected observation: the formula returns 1.5 m for 10 mA and respects the specified low and high endpoints. This verifies your arithmetic, not the accuracy of a physical instrument."
+        },
+        {
+          "type": "paragraph",
+          "text": "Step 3. Calculate the levels for 8.8 mA and 18.0 mA. For each, provide metres and percent of the configured engineering span. Then explain why the result is not a statement about a safe operating level."
+        },
+        {
+          "type": "paragraph",
+          "text": "Step 4. Consider an input reported as 0 mA. Show the numerical extrapolation from the formula, then explain why it should not be accepted as a valid physical level in this example. List at least two categories of information you would request to diagnose the condition without touching a live loop."
+        },
+        {
+          "type": "paragraph",
+          "text": "Step 5. A fictional input module uses raw code 1,000 at the low endpoint and 17,000 at the high endpoint. Calculate the level for raw code 7,000. These codes are deliberately invented for an arithmetic exercise; do not apply them to a real vendor module."
+        },
+        {
+          "type": "paragraph",
+          "text": "Step 6. The HMI displays “1,500 m” when the controller reports 1.500 m. Give two possible interpretations or configuration problems to investigate before deciding which display is correct. Identify the role of locale, decimal separators and unit conversion."
+        },
+        {
+          "type": "paragraph",
+          "text": "Common errors include forgetting to subtract the low endpoint, dividing by the upper value rather than the span, treating all abnormal currents as one specific fault and assuming percent of measurement span equals percent of safe operating capacity. Cleanup requires no system changes: retain the worksheet and its assumptions. Assessment: submit the calculations, units, validity reasoning and evidence requests. Graded solutions are in the instructor edition."
+        }
+      ]
+    },
+    "1.16": {
+      "title": "1.16 Laboratory 2: reproduce and inspect the offline tank model",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Classification: offline computational simulation and offline analysis. Objectives: observe feedback, compare proportional and PI behavior, locate a measurement fault versus a display fault, and verify that numerical results follow the model assumptions. Prerequisites: Sections 1.1-1.14. No PLC programming knowledge is required; reading the source code is optional for the basic exercise."
+        },
+        {
+          "type": "paragraph",
+          "text": "Environment: one computer, the supplied Chapter 1 ZIP, and a local Python interpreter if you choose to regenerate the files. Python 3.13.5 on Linux was used for the executed validation. The source uses standard-library facilities and Python 3.10-or-newer syntax. Windows and macOS execution were not tested here. A learner without Python can complete the interpretation exercise using the supplied CSV files and console-output text. No packages, downloads, network interfaces, credentials or controller addresses are required by the model."
+        },
+        {
+          "type": "paragraph",
+          "text": "Topology: local script → local mathematical tank model → local CSV/JSON files. There is no simulated network protocol, no actual PLC runtime and no physical I/O. These exclusions are part of the experiment's definition, not hidden limitations."
+        },
+        {
+          "type": "paragraph",
+          "text": "Step 1. Extract the ZIP into a new working folder. Read README.txt and data_dictionary.csv. Identify which fields represent simulated physical state, controller measurement and HMI display. Locate the assumptions in tank_lab.py. Do not import the data into a production monitoring pipeline."
+        },
+        {
+          "type": "paragraph",
+          "text": "Step 2. Open supplied_data/p_only.csv and find simulation times 0, 300, 600 and 1,200 seconds. The first row is the state at time zero. Values recorded at time t describe the state at that instant; the command and flows apply over the following interval [t, t+1). There are 1,201 rows per scenario, including both endpoints."
+        },
+        {
+          "type": "paragraph",
+          "text": "Step 3. Confirm that inflow changes from 10 to 14 L/s at t = 300 s. Explain why the controller need not change output at the exact instant the disturbance begins: the feedback level has not yet changed in that instant's state."
+        },
+        {
+          "type": "paragraph",
+          "text": "Step 4. Compare p_only.csv with pi_control.csv. Both use proportional gain 80 percentage points per metre. The PI scenario additionally uses an integral gain of 0.4 percentage points per metre-second. Explain the predicted proportional-only equilibrium before inspecting the last row. Do not describe the PI run as exactly settled simply because it ends close to setpoint."
+        },
+        {
+          "type": "paragraph",
+          "text": "Step 5. Compare sensor_stuck.csv and stale_hmi.csv. In the former, the model's physical water level changes while the controller receives a fixed, plausible reading. In the latter, the local controller continues operating while the display retains an old value. Identify which fields allow you to tell these apart and which would normally be unavailable to a real investigator."
+        },
+        {
+          "type": "paragraph",
+          "text": "Step 6. To regenerate the files, open a terminal in the extracted folder. The following commands were executed using the available Linux Python interpreter. Use an already available Python installation; this release does not provide or validate an installation procedure."
+        },
+        {
+          "type": "paragraph",
+          "text": "python --versionpython tank_lab.py --output generatedpython -m unittest -v"
+        },
+        {
+          "type": "paragraph",
+          "text": "The script creates or overwrites its named files inside the chosen output directory. Use a dedicated empty directory rather than a folder containing unrelated work. The supplied run produced the following rounded final-state summary:"
+        },
+        {
+          "type": "paragraph",
+          "text": "Table 6. Executed model values at t = 1,200 s, rounded to six decimal places."
+        },
+        {
+          "type": "table",
+          "rows": [
+            [
+              "Scenario",
+              "Physical levelm",
+              "Controller levelm",
+              "HMI levelm",
+              "HMI ages"
+            ],
+            [
+              "p_only",
+              "2.249819",
+              "2.249819",
+              "2.249819",
+              "0"
+            ],
+            [
+              "pi_control",
+              "1.989462",
+              "1.989462",
+              "1.989462",
+              "0"
+            ],
+            [
+              "sensor_stuck",
+              "3.800000",
+              "2.000000",
+              "2.000000",
+              "0"
+            ],
+            [
+              "stale_hmi",
+              "1.989462",
+              "1.989462",
+              "2.000000",
+              "900"
+            ]
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "The supplied test report records 14 passing tests. They cover scaling, validity handling, unit-aware volume balance, explicit boundary failure, row counts, the proportional recurrence, this model's late PI offset, the sensor/display distinction and file output. A passing test is evidence that a specified assertion held in this implementation. It is not evidence that an industrial installation is secure or that a safety function meets a required integrity level."
+        },
+        {
+          "type": "paragraph",
+          "text": "Step 7. Inspect the source rule that updates water level. Explain why the flow difference is divided by 1,000 before being divided by tank area. Then inspect the conditional integration rule. At the basic level, you only need to explain that it prevents accumulation farther into an output limit; the exact control mathematics returns in Chapter 4."
+        },
+        {
+          "type": "paragraph",
+          "text": "Step 8. Read scenario_events.jsonl. Each event is explicitly labelled synthetic and some events describe the exercise generator's own actions. These are not real PLC audit messages. Keep the generator's privileged explanation separate from the smaller evidence set that a SOC might actually receive."
+        },
+        {
+          "type": "paragraph",
+          "text": "Common errors: treating simulation time as a wall-clock timestamp, reading the output's percent as L/s, calling a one-second model step a PLC scan, believing a GOOD quality claim proves physical truth, or describing generated JSON as a native vendor log. Another error is silently clamping a model at an empty/full boundary; this implementation raises an error for an unmodelled boundary instead."
+        },
+        {
+          "type": "paragraph",
+          "text": "Reset and cleanup: rerun the script into a fresh local output directory to reproduce the baseline. Preserve the supplied_data folder as the delivered reference. Delete only your newly generated directory when finished. No service, device or network state requires restoration because none was created or modified."
+        },
+        {
+          "type": "paragraph",
+          "text": "Assessment: submit an annotated comparison of the four scenarios, the proportional equilibrium calculation, one sample volume-balance check, the field meanings and a paragraph explaining what the simulation cannot validate. The basic exercise does not require changing source code. Optional extension: inspect the tests and explain why the physical-boundary test is different from a real protection-system test."
+        }
+      ]
+    },
+    "1.17": {
+      "title": "1.17 Laboratory 3: investigate a flat display without inventing an attack",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Classification: offline tabletop analysis. Objective: build an evidence-led first assessment and an appropriate request for operational coordination. Prerequisites: the measurement/display distinction, input/output semantics and the difference between a hypothesis and an observation. Environment: this fictional case packet only; no tools or live access are necessary. Topology: one fictional controller, an operator HMI, an engineering workstation and a historian whose data arrive through the same HMI integration service."
+        },
+        {
+          "type": "paragraph",
+          "text": "At simulation time 600 s, an operator reports that the HMI level has remained at 2.000 m. The following case facts are provided. They are authored exercise evidence, not a reconstruction of a real facility."
+        },
+        {
+          "type": "paragraph",
+          "text": "Evidence E1: the HMI level field is 2.000 m; its last successful source update was at t = 300 s. The display screen itself is still responsive."
+        },
+        {
+          "type": "paragraph",
+          "text": "Evidence E2: a fresh, approved diagnostic export from the controller at t = 600 s reports level 2.122166 m and outlet-pump command 74.311865%. These values intentionally match the stale-HMI model at that instant; their presence does not reveal the full cause of the display problem."
+        },
+        {
+          "type": "paragraph",
+          "text": "Evidence E3: the historian shows the same flat 2.000 m value, but its documented source is the HMI integration service, not a separate level instrument."
+        },
+        {
+          "type": "paragraph",
+          "text": "Evidence E4: the engineering workstation has a successful user login at t = 280 s. A maintenance ticket exists for operator-graphic work. The packet does not include the approved scope, a configuration diff or an audit record proving a controller download."
+        },
+        {
+          "type": "paragraph",
+          "text": "Evidence E5: the HMI integration service recorded connection-retry messages after t = 300 s. The packet contains no independent physical level observation, no fresh flow measurement and no confirmation that the displayed pump status represents actual water flow."
+        },
+        {
+          "type": "paragraph",
+          "text": "Step 1. List the observations without assigning a cause. Step 2. Explain why the historian does not provide independent corroboration of the physical level. Step 3. Propose at least three hypotheses and state which evidence supports or weakens each. Step 4. Specify the next read-only records you would request from operations, engineering and the relevant system owners. Step 5. Draft a short initial incident note with a confidence statement and explicit unknowns."
+        },
+        {
+          "type": "paragraph",
+          "text": "Expected observation: the packet contains enough information to recognize conflicting freshness and source dependencies, but not enough to establish a malicious controller change or the actual physical water level. There is no justification for a learner to isolate or reboot industrial equipment from this packet alone."
+        },
+        {
+          "type": "paragraph",
+          "text": "Common errors include calling a login a proven logic change, treating an existing ticket as proof that every action was authorized, counting the HMI and historian as two independent sensors, or declaring the process safe because the controller export is fresh. The case tests analytical discipline, not only the ability to name a likely fault location."
+        },
+        {
+          "type": "paragraph",
+          "text": "Cleanup/reset: retain the evidence list and draft note; start again with the original facts for a second teach-back. Assessment: observations versus hypotheses, correct source independence, appropriate evidence requests, physical-process caveats and respect for operational authority. The instructor edition contains a model response and scoring rubric."
+        }
+      ]
+    },
+    "1.18": {
+      "title": "1.18 Knowledge checks and application exercises",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Q1. In your own words, explain what the tank system is trying to achieve. Your explanation must include material flow and stored inventory, not only the PLC or HMI."
+        },
+        {
+          "type": "paragraph",
+          "text": "Q2. Why can a flat level trend coexist with continuous flow through the tank? Give two different inflow/outflow pairs that maintain constant level in the ideal model."
+        },
+        {
+          "type": "paragraph",
+          "text": "Q3. Explain the distinction between a sensor, transmitter, PLC input and operator display. Identify where a scaling error could enter the chain."
+        },
+        {
+          "type": "paragraph",
+          "text": "Q4. Calculate the level for 8.8 mA on the chapter's 0-4 m span. State why 0 mA needs a separate validity interpretation."
+        },
+        {
+          "type": "paragraph",
+          "text": "Q5. The tank starts at 2.2 m. Inflow is 12 L/s and outflow is 8 L/s for 15 s. With area 2 m², calculate the new level under the stated constant-flow assumption."
+        },
+        {
+          "type": "paragraph",
+          "text": "Q6. Why does the controller increase outlet pumping when measured level is above target? How would the explanation change if the controlled pump filled the tank instead?"
+        },
+        {
+          "type": "paragraph",
+          "text": "Q7. With proportional gain 80, bias 50%, target 2 m and measured level 2.25 m, calculate command and ideal outflow. Explain how these relate to the 14 L/s disturbance."
+        },
+        {
+          "type": "paragraph",
+          "text": "Q8. Why can proportional-only control require a residual error after a disturbance? What additional role does integral action provide?"
+        },
+        {
+          "type": "paragraph",
+          "text": "Q9. Explain why a 4-20 mA measurement is not a DI just because the controller stores its value digitally."
+        },
+        {
+          "type": "paragraph",
+          "text": "Q10. Distinguish pump command, drive-running feedback and actual outlet flow. Which relationship is an assumption of the supplied model rather than a general equipment guarantee?"
+        },
+        {
+          "type": "paragraph",
+          "text": "Q11. Can a plausible measurement with a GOOD quality claim still be wrong? Use the supplied scenarios to explain without calling the cause malicious."
+        },
+        {
+          "type": "paragraph",
+          "text": "Q12. Why is a repeated value not, by itself, proof of stale data? What time-related evidence would help?"
+        },
+        {
+          "type": "paragraph",
+          "text": "Q13. Does manual mode necessarily disable protective functions? What document or evidence would establish the actual behavior for a particular system?"
+        },
+        {
+          "type": "paragraph",
+          "text": "Q14. Explain why the HMI and historian may not be independent sources. What would stronger corroboration need to consider?"
+        },
+        {
+          "type": "paragraph",
+          "text": "Q15. What can the 14 executed software tests establish, and what can they not establish about a physical process, a vendor PLC or a safety function?"
+        },
+        {
+          "type": "paragraph",
+          "text": "Q16. Distinguish a normal control function, an alarm, a permissive and a protective trip. Do not assign a safety integrity level to the fictional tank."
+        },
+        {
+          "type": "paragraph",
+          "text": "Application A. Draw the measurement and command paths for a pump that feeds a tank rather than draining it. Label the controlled quantity, measurement, controller and actuator. Explain the required direction of feedback. No real wiring or safety design is requested."
+        },
+        {
+          "type": "paragraph",
+          "text": "Application B. An operator reports “the pump is at 90%, but the level is rising.” Build an evidence-request note. Your note must identify at least one process explanation, one measurement explanation, one actuation explanation and one information-path explanation. Avoid assuming that the pump-command graphic is actual measured flow."
+        },
+        {
+          "type": "paragraph",
+          "text": "Application C. Teach a five-minute explanation of why “the HMI is frozen” does not necessarily mean “the PLC has stopped.” Use one diagram, one model result and one limitation. A partner should then ask whether a fresh PLC value proves the real level; answer without overstating what is known."
+        }
+      ]
+    },
+    "1.19": {
+      "title": "1.19 Chapter recap and evidence discipline",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "A control system exists to observe and influence a physical process. In the tank, water balance determines level; the electronics provide representations and actions within that physical relationship. You should now be able to follow a measurement from the tank through a transmitter, input conversion, logic, output and pump, then return to the changed process."
+        },
+        {
+          "type": "paragraph",
+          "text": "The central distinctions are physical truth versus measurement versus display; command versus feedback versus actual flow; signal range versus approved operating range; local control versus supervision; and an observation versus its possible causes. These distinctions will recur in every protocol, platform and cybersecurity chapter."
+        },
+        {
+          "type": "paragraph",
+          "text": "The equations, numerical tuning, diagrams and data in this chapter are authored educational examples. The loop-signaling, controller-execution and standards references identify the external basis where used. Nothing here is an approved plant operating instruction. Chapter 2 begins the electrical and measurement foundations needed to interpret instrument interfaces without treating them as abstract network fields."
+        }
+      ]
+    },
+    "2.1": {
+      "title": "2.1 The installation we are trying to understand",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Our fictional tank has a configured level range of 0–4 m. A loop-powered transmitter sends 4–20 mA to an analog input. The input converts that electrical measurement into a number. Controller logic scales the number into metres, uses it for control, and publishes a value to the operator display. A historian stores a selection of the resulting observations. A separate motor-power circuit supplies the outlet pump; the measurement loop does not provide the energy that moves the water."
+        },
+        {
+          "type": "paragraph",
+          "text": "For the electrical example, assume a 24 V DC supply, a transmitter that needs at least 12 V at its terminals, a receiver resistance of 250 ohms, a combined outward-and-return cable resistance of 100 ohms, and an additional series device with an assumed 2 V drop. These are the complete assumptions for the arithmetic. An actual isolator or barrier must be assessed from its own circuit and data sheet; many are not described adequately by a fixed voltage drop."
+        },
+        {
+          "type": "paragraph",
+          "text": "The measurement path and the control path are related but not identical. A frozen HMI connection may leave local control working. A failed transmitter can deprive the controller of trustworthy input even while the HMI connection is excellent. A failed motor-power circuit can prevent pumping even though the controller repeatedly issues a correct command. Locating the failure requires identifying which boundary has actually been tested."
+        },
+        {
+          "type": "paragraph",
+          "text": "A useful first question is therefore not “Does it respond to ping?” It is “Which process function is this device responsible for, and what evidence confirms that the function occurred?” Network reachability answers only one limited part of that question."
+        }
+      ]
+    },
+    "2.2": {
+      "title": "2.2 Voltage, current, resistance and power",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Voltage is an electrical potential difference between two points. It is measured in volts, abbreviated V. Current is the rate at which electric charge passes through a circuit; its unit is the ampere, A. Resistance describes opposition to current and is measured in ohms. For the simple resistive parts of this teaching circuit, Ohm’s law is V = I × R."
+        },
+        {
+          "type": "paragraph",
+          "text": "The water analogy is helpful up to a point. A pressure difference can drive flow through a restriction, just as a voltage difference can drive current through resistance. But an electronic transmitter is not merely a passive restriction: its electronics regulate current to represent a measurement and need sufficient operating voltage to do so. Do not use the analogy to infer how a real transmitter behaves below its minimum supply specification."
+        },
+        {
+          "type": "paragraph",
+          "text": "The prefix milli means one thousandth. Consequently, 20 mA is 0.020 A, not 20 A. Across a 250-ohm receiver, that current produces 0.020 × 250 = 5 V. At 4 mA, the same resistance produces 1 V. At 12 mA, it produces 3 V. These are voltage drops across that specific resistance, not the supply voltage of the complete installation."
+        },
+        {
+          "type": "paragraph",
+          "text": "Power is the rate of energy transfer. For this example, P = V × I = I² × R. At 20 mA, the 250-ohm receiver dissipates (0.020)² × 250 = 0.10 W. That calculation does not select an acceptable resistor component: real selection also depends on tolerance, temperature, isolation, fault conditions and design margins. Nor does a nominal 24 V measurement supply establish that a cabinet is safe to touch; other circuits and stored energy may be present."
+        },
+        {
+          "type": "paragraph",
+          "text": "Think of three distinct statements: “the supply is 24 V,” “the loop carries 12 mA,” and “the receiver has a 3 V drop.” They can all be true simultaneously. Confusing them is a common reason that technically capable IT practitioners struggle with instrument-loop drawings. [R14: NI current-loop fundamentals. All numerical values and calculations in this section are original teaching assumptions.]"
+        }
+      ]
+    },
+    "2.3": {
+      "title": "2.3 A current loop still needs a voltage budget",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "In a simple series circuit, the same current flows through every series element. The transmitter adjusts the current, while the supply must provide enough voltage for the transmitter, the receiver, the wiring and other components. Saying that current signalling tolerates cable resistance does not mean that cable resistance is irrelevant."
+        },
+        {
+          "type": "paragraph",
+          "text": "For our assumptions, the required supply voltage at a specified current is:"
+        },
+        {
+          "type": "paragraph",
+          "text": "required_V = transmitter_minimum_V           + current_A × (receiver_ohms + total_wire_ohms)           + assumed_other_drop_Vmargin_V   = available_supply_V - required_V"
+        },
+        {
+          "type": "paragraph",
+          "text": "At 20 mA, the resistance total is 250 + 100 = 350 ohms. Its drop is 0.020 × 350 = 7 V. The transmitter needs 12 V and the other series device uses 2 V, so the requirement is 21 V. A 24 V supply leaves 3 V of calculated margin. A 20 V supply leaves minus 1 V: this model cannot guarantee the requested 20 mA operating point."
+        },
+        {
+          "type": "paragraph",
+          "text": "An installation may appear satisfactory at a lower current and fail only near its upper range. At 4 mA, the calculated requirement is only 12 + 0.004 × 350 + 2 = 15.4 V. Thus a weakened 20 V supply can satisfy our low-current calculation while failing at 20 mA. A technician who checks only the low end could miss the problem."
+        },
+        {
+          "type": "paragraph",
+          "text": "The arithmetic should also consider a manufacturer-specified diagnostic or overrange current when it exceeds 20 mA. For illustration only, a 22 mA check gives 12 + 0.022 × 350 + 2 = 21.7 V, leaving 2.3 V from 24 V. This does not assert that any particular transmitter uses 22 mA, nor that this margin is an acceptable engineering design allowance."
+        },
+        {
+          "type": "paragraph",
+          "text": "Under insufficient voltage, a real device might limit current, restart, declare a diagnostic fault or behave in another documented way. The budget identifies an electrical constraint; it does not predict undocumented firmware behaviour. To investigate a real symptom, obtain the supply specification, transmitter operating envelope, analog-input data sheet, loop drawing and approved measurement records. [R14.]"
+        }
+      ]
+    },
+    "2.4": {
+      "title": "2.4 Two wires, three wires and four wires: count the right thing",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "A two-wire, loop-powered transmitter can use the same pair for operating power and current signalling. A separately powered transmitter may have additional power connections and a distinct output circuit. A three-wire arrangement may share a common conductor. These descriptions are useful only alongside the terminal diagram, grounding arrangement and input requirements of the actual products."
+        },
+        {
+          "type": "paragraph",
+          "text": "The phrase “four-wire device” is not enough to decide how to connect an instrument. Four wires at a resistance temperature detector can describe a measurement technique for reducing lead-resistance error. Four wires at a separately powered transmitter can describe power and output connections. Those are different interfaces, even though the wire count is the same. A temperature sensor may connect to a transmitter, and that transmitter may then connect to a PLC input through a different interface."
+        },
+        {
+          "type": "paragraph",
+          "text": "Similarly, active and passive are overloaded terms. A data sheet may use them to describe whether a current input supplies loop power, whether an output drives current, or a particular circuit convention. Translate the term into a concrete question: who supplies energy to this loop, and which component regulates the signal? Connecting two power-supplying interfaces together or expecting two passive interfaces to power each other is not resolved by knowing that both labels mention 4–20 mA."
+        },
+        {
+          "type": "paragraph",
+          "text": "This course does not prescribe wiring from a generic sketch. Before any authorised field work, the responsible instrumentation engineer needs compatible terminal diagrams, isolation requirements, hazardous-area documentation where applicable, and a controlled work procedure. In this release, all exercises are paper calculations or offline data analysis. [R14; S410.1, PDF 31–33, printed 29–31. The interface distinctions are explanatory extensions, not a reproduction of a SANS wiring procedure.]"
+        }
+      ]
+    },
+    "2.5": {
+      "title": "2.5 DI, DO, AI and AO are directions relative to a system",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "An input brings information into the controller or I/O subsystem. An output sends a command or indication out of it. DI means discrete input, DO discrete output, AI analog input, and AO analog output. “Digital input” is commonly used for a discrete input, but do not conclude that every digital network message is a single DI point. The supplied ICS410 introduces basic discrete and analog I/O; here we connect those categories to an actual process. [S410.1, PDF 32, printed 30.]"
+        },
+        {
+          "type": "paragraph",
+          "text": "A pump-running auxiliary contact can be a DI. An analog level transmitter can feed an AI. A request to energise an interposing relay can be a DO. A variable pump-speed demand can be an AO, or it can be represented by a message over a supported network. The physical interface and the meaning of the point must both be recorded."
+        },
+        {
+          "type": "paragraph",
+          "text": "A DO does not necessarily supply motor power. In a typical conceptual chain, a low-power controller output requests action through an interface, while a properly designed starter or drive handles a separate power circuit. The output rating, load type and protection requirements cannot be inferred from the software Boolean. Likewise, a feedback contact labelled RUNNING may indicate a starter state rather than independently prove that liquid is flowing."
+        },
+        {
+          "type": "paragraph",
+          "text": "A dry contact does not supply the measuring voltage itself; an appropriate input circuit detects its open or closed condition. A powered electronic sensor may instead present a defined voltage or current relationship. Sourcing and sinking describe current paths. PNP and NPN describe transistor arrangements often used in sensor outputs. These terms are not permission to guess the wiring: the common reference, input type, terminal assignment and manufacturer’s circuit diagram have to agree."
+        },
+        {
+          "type": "paragraph",
+          "text": "Consider the information ladder for a pump: a software command is not the same as an energised output; an energised output is not the same as a closed contactor; a closed contactor is not the same as a rotating shaft; a rotating shaft is not the same as delivered flow. Each step can require a different observation. The distinction becomes crucial when diagnosing a malicious command, an electrical fault, a seized pump or a dry suction condition."
+        }
+      ]
+    },
+    "2.6": {
+      "title": "2.6 Sensor, transmitter, actuator and final control element",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "A sensor responds to a physical quantity. A transmitter conditions or converts a measurement into a usable signal or message. A transducer converts one form of physical quantity or energy into another; the term is broader than a networked sensor. An actuator produces physical action. A final control element directly changes the process input or output, such as a valve assembly that changes flow. A manufacturer may integrate several roles into one product."
+        },
+        {
+          "type": "paragraph",
+          "text": "For temperature measurement, the sensing element might be a resistance temperature detector or thermocouple. A transmitter can interpret that element and produce a configured output. A thermowell, when present, is a physical protective interface; it is not the temperature transmitter. For a control valve, the valve body, actuator and positioner have related but different jobs. The positioner regulates actuator behaviour so that the valve moves toward the requested position; it does not make the complete valve assembly synonymous with the positioner."
+        },
+        {
+          "type": "paragraph",
+          "text": "A terminology clarification is necessary in the supplied material. ICS410’s field-device slide separates sensors from actuators, but the prose below it includes pressure sensors and thermocouples among an actuator list. In this book they are classified by function: a thermocouple used to measure temperature belongs to the measurement path, not the actuation path. We preserve the source location so the distinction is explicit rather than silently carrying the inconsistent list forward. [S410.1, PDF 31, printed 29; V02, V03 for real transmitter and valve-controller examples.]"
+        },
+        {
+          "type": "paragraph",
+          "text": "An assembly can also have feedback inside it. A valve positioner may receive a demand, observe stem position, and adjust actuator pressure. The main process controller may separately observe tank level. These are nested loops with different measurements and purposes. Loss of one feedback path is not equivalent to loss of every loop."
+        }
+      ]
+    },
+    "2.7": {
+      "title": "2.7 Range, span, units and the meaning of a number",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "The lower and upper configured endpoints determine a linear scaling relationship. Span is upper endpoint minus lower endpoint. For a current I in mA, lower endpoint L and upper endpoint U, our linear measurement conversion is:"
+        },
+        {
+          "type": "paragraph",
+          "text": "engineering_value = L + ((I - 4) / 16) × (U - L)"
+        },
+        {
+          "type": "paragraph",
+          "text": "A transmitter configured for 0–4 m yields 2 m at 12 mA. A transmitter configured for minus 1 to plus 3 m yields 1 m at the same current. A 0–10 bar pressure transmitter yields 5 bar. The current alone does not supply the unit or endpoints; configuration supplies their meaning."
+        },
+        {
+          "type": "paragraph",
+          "text": "Distinguish the physical sensor limits, the permitted configurable range, the configured measurement range, the analog-output mapping, the controller’s scaling, the displayed unit, and the operational alarm limits. They can be different. A 0–4 m measurement range does not establish that operation at 4 m is acceptable. A device capability advertised as a large maximum pressure does not mean a particular installed range uses that maximum."
+        },
+        {
+          "type": "paragraph",
+          "text": "For the tank, suppose the transmitter is changed from 0–4 m to 0–8 m while the controller remains configured for 0–4 m. At a true level of 2 m, the re-ranged transmitter produces 4 + 16 × (2/8) = 8 mA. The controller interprets 8 mA as 1 m. Both components may be functioning exactly as configured, but their interpretations disagree."
+        },
+        {
+          "type": "paragraph",
+          "text": "This error can look deceptively healthy: the current is within the normal range, packets continue to arrive, timestamps advance, and the PLC’s numerical calculation is internally correct. Re-ranging may have been authorised maintenance, a mistake, an incomplete migration, or unauthorised activity. The symptom does not determine the cause. [R14; V01. The mismatch scenario is original and fictional.]"
+        }
+      ]
+    },
+    "2.8": {
+      "title": "2.8 Calibration is not the same as changing a range",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Calibration compares a measurement with a suitable reference under specified conditions. Adjustment changes something so that the instrument meets a desired relationship. Re-ranging changes configured endpoints or output mapping. These activities can be related during maintenance, but they are not interchangeable statements."
+        },
+        {
+          "type": "paragraph",
+          "text": "When a work order says “calibrated,” an investigator should ask what was compared, what reference was used, what as-found and as-left results were recorded, whether any adjustment occurred, and whether range, damping or unit settings changed. A successful communication test is not a calibration. A matching HMI and historian value is not an independent reference when both receive the same upstream tag."
+        },
+        {
+          "type": "paragraph",
+          "text": "A numerical check should also distinguish zero error from span error. A simplified zero error adds approximately the same offset across a range. A simplified span error changes the slope. Real sensor behaviour may include nonlinearity, hysteresis, drift, environmental dependence and uncertainty. A single test point cannot characterise all of these effects, and this introductory exercise does not establish traceable calibration competence."
+        },
+        {
+          "type": "paragraph",
+          "text": "For cybersecurity, the practical asset is not just the transmitter. The chain includes the configuration tool, instrument definition files where used, access permissions, approved settings, change record and engineering review. Store the approved configuration and evidence of changes with a clear date and owner. Do not assume that a smart instrument always exports a complete, tamper-resistant audit trail. [V01, V02; S410.2, PDF 136, printed 59.]"
+        }
+      ]
+    },
+    "2.9": {
+      "title": "2.9 Resolution, accuracy and raw counts",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "An analog-to-digital converter represents a measurement with a finite set of numerical codes. In an ideal N-bit example with codes from 0 to 2^N minus 1, resolution describes the spacing between representable levels. It does not by itself establish measurement accuracy. Noise, offset, gain error, temperature effects and the physical sensor can dominate the overall result."
+        },
+        {
+          "type": "paragraph",
+          "text": "For a fictional 12-bit input that maps codes 0–4095 linearly to 0–4 m, an endpoint-based conversion gives 4/4095 = approximately 0.000977 m per code. An ideal interior quantisation-bin convention may instead use 4096 intervals. State the convention. At either resolution, printing six decimal places on a dashboard does not turn a millimetre-scale input into a micrometre-accurate measuring system."
+        },
+        {
+          "type": "paragraph",
+          "text": "Real PLC input modules do not necessarily expose their complete converter range as a simple 0–4095 number. They may reserve values for underrange, overrange or errors, use signed codes, expose engineering units directly, or apply a manufacturer-specific normalisation. A commonly encountered raw value in one ecosystem must not be copied into another module’s formula without its manual."
+        },
+        {
+          "type": "paragraph",
+          "text": "A useful asset record therefore includes the input-module order number, configured channel type, range, representation, scaling location and diagnostic mapping. “PLC analog input” is not precise enough to reconstruct a disputed measurement after an incident. [S410.1, PDF 32, printed 30; R14. The quantisation calculation is an original idealised example, not a specification for a named PLC.]"
+        }
+      ]
+    },
+    "2.10": {
+      "title": "2.10 Quality, freshness and plausibility are different tests",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "A value can fail in at least three independent ways. Its acquisition system can report bad quality. It can be too old for the question being asked. Or it can be implausible in the physical context despite looking fresh and well formed. A single green icon rarely demonstrates all three properties."
+        },
+        {
+          "type": "paragraph",
+          "text": "An input of 0 mA lies outside our assumed 4–20 mA valid measurement interval. Applying the scaling equation mechanically would produce minus 1 m for a 0–4 m range, but that arithmetic is not a valid level measurement. The application should interpret the documented channel status and instrument behaviour. Specific alarm-current thresholds, overrange behaviour and input diagnostics depend on the model, configuration and applicable engineering practice; this course does not assign a universal meaning to every abnormal current."
+        },
+        {
+          "type": "paragraph",
+          "text": "A held-last-value can be especially misleading. The number may remain plausible while its sample timestamp stops advancing. Conversely, a transmitter can send a fresh but incorrect value repeatedly. In the first case, age is useful; in the second, age alone is insufficient. Record the original acquisition timestamp, the ingestion timestamp, and any quality flag separately whenever the system exposes them."
+        },
+        {
+          "type": "paragraph",
+          "text": "The following is our own synthetic evidence format, not a Rosemount, Siemens, ABB or SANS log schema:"
+        },
+        {
+          "type": "paragraph",
+          "text": "{\"asset_id\":\"LT-201\",\"signal_mA\":8.0, \"controller_level_m\":1.0,\"configured_span_m\":4.0, \"source_time\":\"2026-10-15T09:00:00Z\", \"ingest_time\":\"2026-10-15T09:00:01Z\", \"quality\":\"good\",\"evidence_kind\":\"synthetic\"}"
+        },
+        {
+          "type": "paragraph",
+          "text": "This record describes what a particular software path reports. It does not independently prove the physical level or the transmitter’s actual internal configuration. The exercise deliberately requires an additional configuration record and an independent observation before drawing a stronger conclusion. [S515.2, PDF 177–185, printed 33–41; Chapter 1’s executed frozen-sensor and stale-HMI scenarios.]"
+        }
+      ]
+    },
+    "2.11": {
+      "title": "2.11 HART adds a second information path",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "The supplied ICS410 introduces HART as an example of smart communication associated with traditional current-loop wiring. FieldComm Group describes conventional wired HART as combining the analog primary-value channel with digital communication over the same pair. The digital exchange can carry status, diagnostics, additional values and configuration-related information. These capabilities are distinct from merely reading the current with an ordinary analog input. [S410.1, PDF 33, printed 31; V11.]"
+        },
+        {
+          "type": "paragraph",
+          "text": "A plant might have a HART-capable instrument but an input path that forwards only the analog measurement. Another installation might use HART-capable I/O, a multiplexer or an asset-management integration. A maintenance communicator can create another access path. The existence of HART in the device specification does not establish that the SOC receives HART data, or that all configuration actions are visible in a network capture taken elsewhere."
+        },
+        {
+          "type": "paragraph",
+          "text": "There are also modes and variants within the broader technology family. Do not apply the simple one-transmitter, continuously varying current-loop explanation to every multidrop arrangement, WirelessHART installation or other HART transport. The detailed protocol chapter will separate those cases. Here, the learning objective is to identify which channel carries which evidence."
+        },
+        {
+          "type": "paragraph",
+          "text": "For the re-ranging example, an ordinary AI may continue to show a perfectly acceptable 8 mA. A separately validated device-configuration export might reveal a 0–8 m range. A network sensor on the PLC–HMI link could see neither the maintenance interaction nor the local instrument configuration. Visibility placement must follow the actual communication path, not the brand name."
+        }
+      ]
+    },
+    "2.12": {
+      "title": "2.12 Trace the fault before choosing a containment action",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Consider five observations from a fictional investigation. The HMI shows 1.00 m. The controller reports 8.00 mA and scales it to 1.00 m. A technician’s approved independent reference indicates approximately 2.00 m. An as-left configuration export records a 0–8 m transmitter range. The approved loop record still specifies 0–4 m. All observations are contemporaneous for the purpose of this exercise."
+        },
+        {
+          "type": "paragraph",
+          "text": "The arithmetic explains the discrepancy: 2 m is one quarter of the transmitter’s new range, so it produces 8 mA; the controller interprets one quarter of its old range as 1 m. This is stronger than the initial claim “the display is wrong,” because it identifies a specific interpretation boundary. It is still not enough to decide who changed the range or whether the change was malicious."
+        },
+        {
+          "type": "paragraph",
+          "text": "The initial response should preserve the configuration evidence, identify the authorised change owner, establish the operating consequence, and coordinate with operations. It should not automatically restore a guessed range: the approved documentation itself could be obsolete, and the process may have changed. A correct recovery needs an engineering decision and validation against the actual application."
+        },
+        {
+          "type": "paragraph",
+          "text": "Now consider a different observation: many unrelated analog channels drift or fail near the same time, all sharing one field power supply, while controller communications remain normal. That pattern makes a common electrical dependency a useful hypothesis. It does not prove a power-supply fault, but it gives a different investigation path from a single re-ranged instrument. Mapping dependencies is valuable for both reliability and security analysis. [S410.2, PDF 136–139, printed 59–62; S515.2, PDF 160–185, printed 16–41. Scenarios and response reasoning are original extensions.]"
+        }
+      ]
+    },
+    "2.13": {
+      "title": "2.13 From an equipment list to a Collection Management Framework",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "ICS515 does not treat an asset list as the end of visibility work. Its Collection Management Framework, or CMF, connects a requirement to available data, storage locations, retention and practical investigation procedures. Its development sequence is to define requirements, develop a collection plan, implement its use, test it, and update the plan. This is especially useful for our device-focused course: knowing a transmitter model does not automatically tell us whether a disputed change can be investigated. [S515.2, PDF 177–185, printed 33–41.]"
+        },
+        {
+          "type": "paragraph",
+          "text": "Our original requirement is: “Determine whether a level-scaling discrepancy arose from transmitter configuration, controller scaling, stale presentation, or a physical/electrical fault.” Start there, rather than collecting every source without knowing what question it answers."
+        },
+        {
+          "type": "table",
+          "rows": [
+            [
+              "Evidence source",
+              "What it can help establish",
+              "Important limitation"
+            ],
+            [
+              "Approved loop record and I/O list",
+              "Intended tag, range, wiring and channel mapping",
+              "A document can be obsolete or refer to a different revision"
+            ],
+            [
+              "Device configuration export",
+              "Reported range, units and settings at an identified time",
+              "Export method, completeness and provenance need validation"
+            ],
+            [
+              "Controller project and channel diagnostics",
+              "Scaling implementation and input status",
+              "Offline project may differ from the running configuration"
+            ],
+            [
+              "HMI or historian samples",
+              "Published values, timing and selected quality information",
+              "Both can inherit one incorrect upstream value"
+            ],
+            [
+              "Engineering workstation and access records",
+              "Sessions and selected activities",
+              "A login alone does not prove an instrument change"
+            ],
+            [
+              "Approved independent process observation",
+              "A separate check on the physical condition",
+              "Timing, uncertainty and method must be documented"
+            ]
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "The CMF should distinguish expected capability from observed collection. A vendor may advertise diagnostics, the plant may own a compatible tool, and the SIEM may still receive none of the relevant records. Test a known benign event in an approved environment, find the actual record, examine its fields, and establish where it is retained. A policy saying “90 days” is weaker evidence than a query and storage check demonstrating what is actually available."
+        },
+        {
+          "type": "paragraph",
+          "text": "The uploaded ICS515’s example uses a named safety system and a particular local syslog retention period. That is an example within its scenario, not a specification that every product of that brand exports the same records or keeps them for the same number of days. Our workbook therefore labels all configured and observed retention values separately. [S515.2, PDF 183–185, printed 39–41.]"
+        },
+        {
+          "type": "paragraph",
+          "text": "A final qualification matters. A hunt that finds nothing does not establish universal absence of compromise. It can provide bounded negative evidence within the data, time period and detection coverage actually tested. The CMF helps write that boundary accurately instead of confusing “no matching events” with “the event could not have happened.”"
+        }
+      ]
+    },
+    "2.14": {
+      "title": "2.14 Laboratory 2A — Electrical budget without touching a cabinet",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Objective: calculate a loop budget, identify a low-current test that misses a high-current constraint, and explain why a budget failure is not a complete device-failure prediction. Classification: offline calculation only. Prerequisites: Sections 2.1–2.4; no electrical instruments, controllers, network access or administrator privileges."
+        },
+        {
+          "type": "paragraph",
+          "text": "Environment: use the supplied CSV in Chapter_2/supplied_data, a calculator, or the included Python standard-library script. The topology is Figure 2.2. The fields explicitly define supply voltage, minimum transmitter voltage, receiver resistance, total wire resistance, other assumed drop and evaluation current. No field contains a plant address or a live device endpoint."
+        },
+        {
+          "type": "paragraph",
+          "text": "First calculate required voltage and margin for each row. Then compare the nominal 24 V loop with the 20 V supply at 4 mA and 20 mA. Next evaluate the extra-resistance and 22 mA rows. Finally, write one sentence separating the calculated constraint from any unverified statement about a named transmitter’s behaviour. The optional script reproduces the calculations in a fresh output directory."
+        },
+        {
+          "type": "paragraph",
+          "text": "python Chapter_2/loop_evidence_lab.py --output generated_chapter2python -m unittest discover -s Chapter_2 -p \"test_*.py\" -v"
+        },
+        {
+          "type": "paragraph",
+          "text": "Expected observations: the nominal design has positive margin; reducing supply or adding series resistance reduces margin; a lower-current check can pass while the higher-current calculation fails. The instructor edition contains exact numerical results and grading guidance. Common errors include using milliamps as amps, counting only one cable conductor when the supplied value represents a complete pair, and assuming that every barrier behaves as a fixed resistor."
+        },
+        {
+          "type": "paragraph",
+          "text": "Reset and cleanup: the script creates only local CSV files in the requested output directory, requires a new or empty directory, and performs no network communication. Delete that generated directory to reset. Keep the original supplied_data directory unchanged. Assessment: show units, correctly evaluate the cases, and describe the limits of the simplified circuit model."
+        }
+      ]
+    },
+    "2.15": {
+      "title": "2.15 Laboratory 2B — A plausible value from an inconsistent configuration",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Objective: diagnose a range mismatch without equating a plausible signal with a valid measurement or a mismatch with malicious intent. Classification: offline analysis of synthetic records. Prerequisites: Sections 2.7–2.12. Topology: one transmitter, one AI, controller scaling, and a shared HMI/historian publication path, as in Figure 2.4."
+        },
+        {
+          "type": "paragraph",
+          "text": "Read scaling_cases.csv and the separate observation notes. For each case, calculate the transmitter current from the stated physical value and transmitter endpoints. Then calculate what the controller will report using its own endpoints. Identify cases where these numbers agree and disagree. Explain whether the analog current’s validity alone detects each problem."
+        },
+        {
+          "type": "paragraph",
+          "text": "For the investigation case, build a short chain of claims: observed number, source of that number, conversion applied, configuration evidence, independent physical observation, and remaining uncertainty. Do not insert the fixture’s “truth_level_m” into a proposed production detection. That field is supplied by the teaching scenario; a real installation requires an independently justified source."
+        },
+        {
+          "type": "paragraph",
+          "text": "Expected observations: matched ranges agree; a changed transmitter span can generate an in-range current that the controller interprets incorrectly. A stale HMI case is distinguishable from a fresh but mis-scaled value when trustworthy source timestamps are available. Common errors include treating an engineering workstation login as proof of a range change, assuming a historian is independent of its upstream source, and confusing an approved drawing with proof of the current configuration."
+        },
+        {
+          "type": "paragraph",
+          "text": "Reset: this exercise modifies no source record. Remove any optional generated output directory and start again from the unchanged fixtures. Assessment: the learner must correctly trace the arithmetic and provide a qualified conclusion that separates mechanism, consequence and attribution."
+        }
+      ]
+    },
+    "2.16": {
+      "title": "2.16 Laboratory 2C — Device identity and evidence coverage",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Objective: extend a small asset register into a tested collection plan. Classification: offline tabletop. Prerequisites: the equipment atlas and Section 2.13. Environment: assets.csv, evidence_manifest.csv and case_notes.md; these are fictional records constructed for this book, not captures from a customer or from the SANS classroom environment."
+        },
+        {
+          "type": "paragraph",
+          "text": "Build one record per physical or software role, but also record relationships: which input channel belongs to which controller, which transmitter feeds that channel, which HMI and historian share a source, and who approves instrument changes. Separate a human-friendly asset name from the verified manufacturer, family, order number, hardware revision and firmware. An asset named “Safety PLC” is not proof that the hardware, application or safety function is certified for its use."
+        },
+        {
+          "type": "paragraph",
+          "text": "For each investigation question, identify a data source, actual storage location, observed retention, clock basis, owner and one limitation. Mark capabilities as documented, configured, observed, or tested. A field that is unknown should remain unknown, with an assigned verification action; filling it with an attractive default makes the inventory less trustworthy."
+        },
+        {
+          "type": "paragraph",
+          "text": "Expected observations: the fixture contains a policy-versus-observed retention discrepancy, a shared upstream dependency, and an inventory item whose nickname suggests more than its verified identity supports. The correct response is to narrow claims and identify verification work, not to compensate with a larger list of unsupported fields."
+        },
+        {
+          "type": "paragraph",
+          "text": "Cleanup: none is required for the source files. Delete working copies created during the exercise. Assessment: produce a one-page CMF excerpt and an initial incident note that explains both what can be investigated and what cannot yet be resolved. Instructor solutions and a scoring rubric are in Book A."
+        }
+      ]
+    },
+    "2.17": {
+      "title": "2.17 Knowledge checks and application questions",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Explain why a 24 V supply and a 3 V receiver drop are not contradictory. Calculate the current for a 0–6 m transmitter at 1.5 m. Explain why a four-wire RTD and a four-wire transmitter are not the same connection problem. Describe one way a pump can receive a valid command without producing flow."
+        },
+        {
+          "type": "paragraph",
+          "text": "A transmitter sends 12 mA and the HMI displays 50 percent. List the missing facts needed to interpret a physical level. Explain what a growing ingestion delay can and cannot tell you. Identify two evidence sources that can agree because they share a dependency. Describe the additional evidence needed before attributing a range mismatch to an unauthorised change."
+        },
+        {
+          "type": "paragraph",
+          "text": "An engineer proposes restoring yesterday’s configuration immediately. Identify the process, document-control and evidence-preservation questions that should be resolved before an authorised restoration. Then explain how a known benign event can test a CMF claim without conducting an uncontrolled experiment on a live plant."
+        }
+      ]
+    },
+    "2.18": {
+      "title": "2.18 Chapter recap",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "A measurement is not just a number. It is a physical interaction, an electrical or digital representation, a configuration-dependent conversion, a quality and timing context, and an evidence trail. Correct arithmetic is necessary but insufficient: the endpoints, units, channel identity and source provenance also need to be correct."
+        },
+        {
+          "type": "paragraph",
+          "text": "The field device can be the origin of both a process value and a security-relevant configuration change. The controller can be working correctly on the wrong input. The HMI and historian can agree without independently corroborating the process. A collection plan becomes useful when its data and limitations have been tested, not merely listed."
+        },
+        {
+          "type": "paragraph",
+          "text": "The next chapter will turn these principles into instrument selection and drawing interpretation: pressure and temperature measurements, level and flow technologies, valve and drive assemblies, instrument tags, P&IDs, loop diagrams and I/O lists. The following equipment atlas provides concrete hardware examples before that deeper treatment."
+        }
+      ]
+    },
+    "E1": {
+      "title": "E1. A modular PLC: Siemens S7-1500 and the CPU 1511-1 PN",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "A programmable logic controller repeatedly acquires information, executes an engineered application and updates outputs or communications. The processor is only one part of a modular station. The surrounding assembly can include system and load power supplies, a backplane, communication interfaces, input/output modules, terminals, memory media and wiring. A controller’s engineering project describes more than the program: it also describes hardware, networks, tags and other configured resources."
+        },
+        {
+          "type": "paragraph",
+          "text": "The supplied ICS410 uses an Allen-Bradley modular PLC photograph to introduce that separation. It is useful because the physical modules are visible. The source does not identify the exact CPU in its prose, so this book does not invent an order number from the picture. Nor is that photograph labelled as a Siemens S7-1500. [S410.1, PDF 26, printed 24.]"
+        },
+        {
+          "type": "paragraph",
+          "text": "For a specifically identified Siemens example, the official product catalogue describes CPU 1511-1 PN as an entry-level member of S7-1500 for applications with moderate program and processing requirements. It can serve central and distributed I/O through PROFINET; the catalogue describes an integrated two-port interface. A dated Siemens manual lists standard CPU article 6ES7511-1AL03-0AB0. These identifiers are useful for reading documentation, not a guarantee of compatibility with every project carrying the name “1511.” [V04, V05.]"
+        },
+        {
+          "type": "paragraph",
+          "text": "In the tank example, a PLC could read level, apply the operating logic, calculate an outlet-pump demand and publish status to an HMI. The fictional control loop in Chapter 1 was not executed on this CPU. A real implementation needs a selected I/O module, compatible signal type, engineering-tool and firmware relationship, cycle/timing design, and an authorised validation process."
+        },
+        {
+          "type": "paragraph",
+          "text": "When examining an authorised cabinet photograph, locate the CPU label, power connections, removable media, status indicators, module order numbers and terminal labels. Do not infer the configuration or permissions from appearance. LEDs show selected device states; they are not a complete forensic record. Two Ethernet sockets also do not prove independent security interfaces or provide a firewall boundary."
+        },
+        {
+          "type": "paragraph",
+          "text": "For maintenance and recovery, distinguish the approved offline engineering project from the running application and from whatever a particular upload/export operation can retrieve. Record tool version, device support packages, firmware, hardware configuration, protected components and the tested restoration method. A folder named “PLC backup” is not enough to establish recoverability. Common diagnostic hypotheses include an I/O-channel problem, a configuration mismatch, an application fault, a power dependency and a communication failure; the process symptoms determine which to test first. [S410.1, PDF 26; S515.2, PDF 166, 177–185.]"
+        }
+      ]
+    },
+    "E2": {
+      "title": "E2. A compact PLC: S7-1200 G2 CPU 1214C",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Compact controllers combine a CPU with selected built-in functions and I/O in a small assembly, while allowing defined expansion. Compact does not mean nonindustrial, and modular does not automatically mean safety-rated. The application, exact hardware and certification scope matter more than the shape of the enclosure."
+        },
+        {
+          "type": "paragraph",
+          "text": "A concrete G2 example is CPU 1214C DC/DC/DC, article 6ES7214-1AH50-0XB0 in Siemens’ December 2024 ordering documentation. The same documentation lists AC/DC/relay and DC/DC/relay variants with different article numbers, and separately lists fail-safe CPU 1214FC variants. The slash-separated designations help distinguish supply and input/output arrangements, but the terminal diagram and ratings remain authoritative. They are not interchangeable purchase descriptions. [V06.]"
+        },
+        {
+          "type": "paragraph",
+          "text": "The important migration lesson is particularly relevant to older course notes: Siemens explicitly states that S7-1200 G2 is not hardware-compatible with the previous S7-1200 family. Program conversion and hardware replacement are separate questions. A project that can be migrated does not make an old expansion module electrically or mechanically compatible with the new controller. [V07.]"
+        },
+        {
+          "type": "paragraph",
+          "text": "The current product page also describes NFC-based access to diagnostic/device information and a web server/Web API. Those capabilities expand the inventory and access-control questions; they do not establish that a particular service is enabled, remotely exposed or unauthenticated. Record the actual enabled interfaces, physical access conditions and supported security configuration. [V07.]"
+        },
+        {
+          "type": "paragraph",
+          "text": "As a teaching device, a compact PLC is attractive because a small process can be followed end to end. Nevertheless, the software-only tank simulator does not validate G2 instruction timing, actual I/O behaviour, hardware protection or firmware security. A later isolated hardware lab should use a documented bill of materials and a compatible engineering environment rather than instructions inherited from a different S7-1200 generation."
+        },
+        {
+          "type": "paragraph",
+          "text": "A useful exercise is to compare two inventory entries that both say “CPU 1214C.” One might be an older generation, another a G2; even within G2, different electrical variants exist. Before discussing an advisory or spare, require the complete article number, hardware revision, firmware and role. That is the difference between recognising a product name and knowing which device is actually present."
+        }
+      ]
+    },
+    "E3": {
+      "title": "E3. Remote I/O: Siemens ET 200SP with an IM 155-6 interface",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Remote I/O moves the electrical connection point closer to field devices while a higher-level controller performs the associated application logic. A station can contain an interface module, several signal modules, terminal/base units and power distribution. It is an important asset even when no separate general-purpose control program runs in its head module: losing the station can remove several measurements or commands at once."
+        },
+        {
+          "type": "paragraph",
+          "text": "Siemens describes ET 200SP as a modular IP20 I/O system. Its interface variants include IM 155-6 PN for PROFINET, IM 155-6 DP for PROFIBUS, and IM 155-6 MF for supported MultiFieldbus connectivity. The family also includes controller-based head-end alternatives, so a photograph of narrow ET 200SP modules does not by itself tell you whether the station is only remote I/O or contains a controller. [V08.]"
+        },
+        {
+          "type": "paragraph",
+          "text": "Imagine that six transmitters share a remote cabinet. The IP address may identify the station interface, while each transmitter remains a separate physical process asset with its own tag, range, calibration and wiring. A network-discovery result can therefore undercount the equipment that matters. The asset model should retain both the station and its channel-to-instrument relationships."
+        },
+        {
+          "type": "paragraph",
+          "text": "Fault analysis must distinguish the network path, the station interface, individual signal modules, field supply groups and field wiring. A reachable interface with several bad channels is not the same problem as an unreachable station. Replacement also requires more than matching a module’s width: signal type, base unit, potential group, channel configuration, version compatibility and configured loss-of-communication behaviour must be checked from the actual documentation."
+        },
+        {
+          "type": "paragraph",
+          "text": "For monitoring, channel diagnostics and controller events may be more useful than packets alone. Ask whether the system exports module faults, parameter changes and station failures, and test what the receiving system actually stores. Do not infer a universal syslog interface for remote I/O. The collection framework should show the controller or engineering system through which such evidence is available. [S410.1, PDF 31–33; S515.2, PDF 177–185.]"
+        }
+      ]
+    },
+    "E4": {
+      "title": "E4. A DCS controller: ABB AC 800M and PM866A",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "A distributed control system, or DCS, is an integrated control-system architecture and engineering/operations ecosystem, not merely a different colour of PLC. It commonly combines controller applications, operator interaction, alarms, historical information, engineering tools and defined lifecycle workflows. The boundary with PLC-based systems overlaps; do not use a slogan such as “PLCs are only for discrete processes” to classify every installation. The supplied ICS410 introduces DCS and PLCs separately while noting modern overlap. [S410.1, PDF 25–26, printed 23–24.]"
+        },
+        {
+          "type": "paragraph",
+          "text": "ABB’s AC 800M family is a rail-mounted modular controller platform with CPU, communication, power and accessory components. The official family description lists processors including PM866A and distinguishes variants by characteristics such as memory, redundancy support and safety-related scope. The family page must not be interpreted as certifying every CPU, application and installation for the same safety use. [V09.]"
+        },
+        {
+          "type": "paragraph",
+          "text": "In a process-unit example, an AC 800M controller could participate in the control portion of an 800xA system, while operator and engineering functions reside in other components. The unit’s control logic, I/O configuration, communication interfaces and operator representations need a consistent engineered relationship. A server problem and a controller problem can therefore have different immediate process consequences."
+        },
+        {
+          "type": "paragraph",
+          "text": "The asset description should identify the CPU and communication modules, the I/O architecture, any redundant partner, the engineering environment and the process units served. Redundancy needs a dependency map: two controllers can share field instruments, power sources, cabinets, networks or configuration errors. Duplication alone is not independence."
+        },
+        {
+          "type": "paragraph",
+          "text": "A useful troubleshooting scenario is a restored engineering workstation whose project opens correctly but no longer matches the installed libraries, firmware or communications configuration. The recovery question is not just whether the project file exists. It is whether the complete required environment is controlled and whether a restoration has been validated for the exact system. The later ABB deep-study chapter will examine version-specific engineering and diagnostics rather than assume one workflow across all installed generations."
+        },
+        {
+          "type": "paragraph",
+          "text": "The earlier Iran map contains project evidence for ABB technologies, including migration contexts. It does not verify that PM866A is the processor installed at those sites. Keep “ABB family relevance” and “verified site model” as different evidence fields. [R20, R26; V09.]"
+        }
+      ]
+    },
+    "E5": {
+      "title": "E5. Pressure measurement: Rosemount 3051T and 3051C",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Pressure instruments connect the process to a measurement system. They do not simply “read a pressure number from the network.” The process connection, sensing arrangement, wetted materials, mounting, configured range and environmental limits all affect whether the measurement is appropriate."
+        },
+        {
+          "type": "paragraph",
+          "text": "Emerson’s Rosemount 3051 family includes inline and coplanar arrangements. The verified manufacturer image linked below is a 3051T inline product illustration; it is not a 3051C differential-pressure assembly. The family supports several communication/output options, but a specific ordered transmitter does not necessarily contain every option on the family page. [V01.]"
+        },
+        {
+          "type": "paragraph",
+          "text": "Manufacturer photograph: Rosemount 3051T inline transmitter"
+        },
+        {
+          "type": "paragraph",
+          "text": "Manufacturer technical reference: Rosemount 3051 family"
+        },
+        {
+          "type": "paragraph",
+          "text": "The distinction between gauge, absolute and differential pressure must precede a device choice. Gauge pressure is referenced to local atmospheric pressure; absolute pressure is referenced to vacuum; differential pressure compares two pressures. A pressure-based level calculation then introduces additional process assumptions, including fluid density and the pressure reference at the tank surface."
+        },
+        {
+          "type": "paragraph",
+          "text": "For a fictional open tank of water with density assumed constant at 1,000 kg/m³, a 2 m height corresponds to hydrostatic pressure of rho × g × h = 1,000 × 9.81 × 2 = 19,620 Pa, or 19.62 kPa. This is a physical teaching calculation, not a configured range or installation instruction for a 3051. A pressurised vessel, varying density, impulse-line arrangement or remote seal can require a different measurement model."
+        },
+        {
+          "type": "paragraph",
+          "text": "Ordinary problems can include an unsuitable range, an incorrect pressure reference, a plugged sensing path, trapped gas or liquid in a relevant impulse arrangement, environmental effects or configuration mismatch. Do not infer an adversary from a physically implausible level until the measurement method is understood."
+        },
+        {
+          "type": "paragraph",
+          "text": "The security-relevant record should connect device identity to the process tag, configured endpoints, units, damping, output option, device-access methods and approved changes. Depending on generation and option, diagnostics may help investigate loop or sensing problems; availability and exported evidence must be checked for the exact unit. The SOC should not assume that a HART-capable instrument’s configuration changes are visible in ordinary Ethernet monitoring. [V01, V11.]"
+        }
+      ]
+    },
+    "E6": {
+      "title": "E6. Temperature measurement: Rosemount 3144P",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "A temperature transmitter is not the same object as the temperature-sensing element. The element responds to temperature; the transmitter interprets its electrical behaviour and exposes a configured measurement to another system. Sensor type, connection method and configuration have to agree. A physically connected sensor can produce a wrong value when interpreted using the wrong sensor model."
+        },
+        {
+          "type": "paragraph",
+          "text": "The Rosemount 3144P is a real transmitter family for temperature applications. Emerson describes a dual-compartment housing, sensor diagnostics, and options including dual-sensor/Hot Backup and X-well-related applications. These are product-family capabilities, not assertions that every installed 3144P has the same sensors, options or configuration. [V02.]"
+        },
+        {
+          "type": "paragraph",
+          "text": "Manufacturer photograph: Rosemount 3144P"
+        },
+        {
+          "type": "paragraph",
+          "text": "Manufacturer technical reference: Rosemount 3144P family"
+        },
+        {
+          "type": "paragraph",
+          "text": "A resistance temperature detector changes resistance with temperature; a thermocouple uses a thermoelectric voltage relationship and requires the appropriate reference-junction treatment. The wire-count discussion in Chapter 2 is therefore not cosmetic. Lead compensation for an RTD and the power/output wiring of its transmitter are separate design questions."
+        },
+        {
+          "type": "paragraph",
+          "text": "For a fictional 0–200 degrees Celsius transmitter, 12 mA represents 100 degrees Celsius under our linear mapping. That arithmetic does not reveal whether the correct sensor type is configured or whether the sensor is in good thermal contact with the process. A correct current-loop calculation can coexist with a poor physical measurement."
+        },
+        {
+          "type": "paragraph",
+          "text": "Common investigation questions include whether one sensor or multiple sensors are used, which value is published, whether fallback or backup behaviour is configured, and how faults are represented downstream. Two inputs in one housing are not automatically independent safety measurements. The CMF should record which diagnostics are actually collected, not merely those listed in a brochure."
+        },
+        {
+          "type": "paragraph",
+          "text": "A practical first learning route is to read a sensor-connection diagram, identify the transmitter’s separate output interface, and analyse supplied configuration records without connecting to equipment. Changing a sensor type or range on a production transmitter can change control behaviour; it is an engineering change, not a harmless way to test a security tool. [V02; S410.1, PDF 31–33.]"
+        }
+      ]
+    },
+    "E7": {
+      "title": "E7. A valve positioner: Fisher FIELDVUE DVC6200",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "A control-valve assembly can include a valve body, trim, an actuator, accessories and a positioner. The valve body affects fluid flow. The actuator creates motion. The positioner compares a demand with position feedback and regulates the actuator interface. A solenoid used for a particular protective or operating function is another component, not a synonym for the entire assembly."
+        },
+        {
+          "type": "paragraph",
+          "text": "Emerson describes the Fisher FIELDVUE DVC6200 as a HART-communicating digital valve controller with linkage-less feedback. It is a positioner/control instrument, not a complete valve body and actuator. Available diagnostics and integration depend on the selected product and application. [V03.]"
+        },
+        {
+          "type": "paragraph",
+          "text": "Manufacturer photograph: Fisher FIELDVUE DVC6200"
+        },
+        {
+          "type": "paragraph",
+          "text": "Manufacturer technical reference: DVC6200"
+        },
+        {
+          "type": "paragraph",
+          "text": "In a fictional flow-control loop, the process controller might request more valve opening. The positioner’s local feedback can help move the actuator toward the requested travel. But 50 percent travel is not necessarily 50 percent flow. Valve characteristics, pressure conditions and the wider process determine the flow relationship. Treating these numbers as interchangeable creates both tuning and investigation errors."
+        },
+        {
+          "type": "paragraph",
+          "text": "A valve that does not reach demand can have mechanical, pneumatic, electrical, configuration or process causes. Examples include sticking, inadequate actuator supply, travel limits, a feedback issue or an unsuitable configured relationship. Diagnostics may narrow the possibilities; they do not eliminate the need for process and maintenance expertise."
+        },
+        {
+          "type": "paragraph",
+          "text": "Never infer fail-open or fail-closed behaviour from the positioner brand. The complete assembly and its engineered application determine what happens under specified losses of power, air or signal. A protective-system role needs separate approved documentation. The relevant inventory therefore includes the valve tag, actuator type, positioner identity, control demand path, feedback path, supply dependencies and authorised settings. [V03; S410.1, PDF 31–33.]"
+        }
+      ]
+    },
+    "E8": {
+      "title": "E8. A variable-speed drive: ABB ACS880-01",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "A drive converts electrical power into a controlled supply for a motor. It is not the motor, pump or process itself. In a pump application, the controller may issue a speed demand to the drive, the drive controls the motor’s electrical behaviour, and the motor moves the pump shaft. A displayed frequency or speed demand does not independently confirm delivered fluid flow."
+        },
+        {
+          "type": "paragraph",
+          "text": "ABB identifies ACS880-01 as a wall-mounted member of the ACS880 industrial-drive family. The manufacturer describes direct torque control and configurable integration options, including fieldbus connectivity. The broad family spans different ratings and options, so a complete type code and option list are necessary before applying an installation manual, spare-part decision or advisory. [V10.]"
+        },
+        {
+          "type": "paragraph",
+          "text": "Manufacturer illustrated product reference: ACS880-01"
+        },
+        {
+          "type": "paragraph",
+          "text": "A useful conceptual chain is controller demand → selected drive control source → drive control algorithm → motor → pump → flow. The selected control source matters. A local control-panel mode can behave differently from a remote terminal or fieldbus mode. An investigator must establish which source currently owns the command before interpreting a network record as the effective demand."
+        },
+        {
+          "type": "paragraph",
+          "text": "In a fictional case, the network speed command changes but the motor does not respond. Plausible explanations include the drive operating in local control, an active limitation, a drive fault, a disabled enable/permissive path, a communications mapping problem or a mechanical load issue. A packet showing a requested value does not choose among them."
+        },
+        {
+          "type": "paragraph",
+          "text": "Recovery should preserve the drive’s approved parameter set, motor/application data, option configuration, firmware identity and tested restoration procedure. A generic factory reset is not a safe restoration strategy for a process drive. Safety-related drive functions, where present, must be treated within their documented safety application; a software state or safety-function label is not permission to work on an energised motor circuit. [V10; S410.2, PDF 136, printed 59.]"
+        }
+      ]
+    },
+    "E9": {
+      "title": "E9. An HMI panel: Siemens MTP700 Unified Comfort",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "An HMI is the operator’s interaction and presentation layer. It can display measurements, alarms, trends and selected commands, but it does not thereby become the source of every control decision. Some applications distribute logic across several components, so the actual engineering design must be checked instead of assuming that all logic resides in either the PLC or the panel."
+        },
+        {
+          "type": "paragraph",
+          "text": "Siemens’ Unified Comfort documentation identifies MTP700 as a seven-inch panel in that family. “MTP700” alone is not a sufficient inventory description because a Unified Basic family also contains an MTP700. The family designation and full order number matter alongside the software/runtime relationship. [V12, V13.]"
+        },
+        {
+          "type": "paragraph",
+          "text": "Manufacturer technical reference: MTP700 Unified Comfort"
+        },
+        {
+          "type": "paragraph",
+          "text": "A well-designed teaching screen should make stale or bad-quality information distinguishable from a valid measurement. Colour alone is insufficient. The displayed units, range, source age and operating mode should also be interpretable. A trend showing a flat line could mean a stable process, a frozen source, suppressed recording or presentation behaviour; the application’s acquisition and storage settings determine what evidence remains."
+        },
+        {
+          "type": "paragraph",
+          "text": "A panel’s project, runtime configuration, users, certificates where applicable, network settings and recovery method belong in the asset record. Determine which logs are available and which are actually exported. Do not assume that every HMI emits a standard syslog record for every operator action."
+        },
+        {
+          "type": "paragraph",
+          "text": "A common recovery mistake is to restore an HMI application without validating tag connections and scaling against the current controller project. The screen may look familiar while reading a different tag or applying an old conversion. The fault-isolation exercise in Chapter 2 therefore treats the HMI as one stage in the evidence chain, not as an unquestionable display of truth. [S410.1 supervisory-systems section; S515.2, PDF 177–185.]"
+        }
+      ]
+    },
+    "E10": {
+      "title": "E10. An industrial managed switch: Moxa EDS-4008",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "An industrial switch forwards network frames between connected devices. Its purpose differs from the controller that executes process logic and from a firewall that enforces a specified security policy. Rugged construction, redundant power inputs and a ring-recovery feature are useful attributes, but they do not independently establish a secure architecture."
+        },
+        {
+          "type": "paragraph",
+          "text": "Moxa’s EDS-4008 series contains eight-port managed-switch variants with different combinations of copper, fibre, gigabit uplinks and Power over Ethernet options. A suffix is therefore part of the identity, not a decoration. The manufacturer’s support listing includes a June 2026 data sheet and separate operating-system documentation; matching the installed firmware to the correct manual matters. [V14.]"
+        },
+        {
+          "type": "paragraph",
+          "text": "Manufacturer illustrated product reference: EDS-4008 series"
+        },
+        {
+          "type": "paragraph",
+          "text": "For a fictional remote cabinet, the switch may connect the PLC, remote I/O interface, HMI and an uplink. An incorrect VLAN, port state, loop, fibre selection or redundancy configuration can disrupt that cabinet. If two power inputs originate from the same upstream supply, the apparent redundancy has a common dependency. The network drawing should preserve those details."
+        },
+        {
+          "type": "paragraph",
+          "text": "For a SOC, the attractive functions are not just packet forwarding. Configuration access, port state, time configuration and available event/management records can help explain a disturbance. However, the CMF must verify which features the exact switch supports, what is enabled, which fields arrive, and how long they are retained. Do not invent field names from another vendor’s syslog format."
+        },
+        {
+          "type": "paragraph",
+          "text": "Port mirroring is useful but is not a promise of complete, lossless visibility. Oversubscribed mirrors, missing traffic directions and traffic outside the observation point can create gaps. Configuring a mirror or inserting monitoring equipment also changes the engineered environment and must be authorised. Monitoring deployment is not automatically risk-free merely because the eventual sensor observes rather than controls the process. [S515.2 visibility and network-mapping sections; V14.]"
+        }
+      ]
+    },
+    "E11": {
+      "title": "E11. An RTU: Siemens SICAM A8000 CP-8050",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "A remote terminal unit supports telecontrol and automation, often connecting geographically separated process or electrical assets to supervisory systems. Its local functions and communications can overlap with PLC capabilities. The useful distinction is the engineered role, interfaces and operating requirements, not an absolute claim that one device type can or cannot perform local logic."
+        },
+        {
+          "type": "paragraph",
+          "text": "The supplied ICS410 uses a generic RTU architecture illustration. Siemens ProductCERT describes SICAM A8000 RTUs as modular devices for telecontrol and automation in energy supply. CP-8050 is a specific processor/controller example within that family. [S410.1, PDF 50, printed 48; V15.]"
+        },
+        {
+          "type": "paragraph",
+          "text": "An RTU at a fictional substation might exchange status and supervisory commands with a control centre while interfacing with local devices. That does not mean every command travels directly through it, or that the protection system depends on the control-centre connection. The actual control and protection dependencies need to be drawn separately."
+        },
+        {
+          "type": "paragraph",
+          "text": "The device record should include exact processor hardware, firmware package, communication modules, enabled protocols, time source, approved configuration, remote-access path and local maintenance access. A complete identifier can materially change an advisory decision. The worked example following the atlas demonstrates a case where updating firmware alone is not the complete remedy."
+        },
+        {
+          "type": "paragraph",
+          "text": "Do not practise by probing a public RTU or replaying live control traffic. A first learning route is to study an offline configuration, read a manufacturer’s architecture description, classify captured laboratory messages and build a dependency map. An eventual simulator or hardware lab must state which functions it actually models. [V15; S515.2 asset-identification and visibility sections.]"
+        }
+      ]
+    },
+    "E12": {
+      "title": "E12. A protection IED: Siemens SIPROTEC 7SJ85",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "An intelligent electronic device in a power-system context can implement protection, measurement, control and recording functions. A protection relay assesses electrical conditions according to its engineered settings and can participate in a trip scheme. It is not simply an IT relay that forwards messages, and its trip output is not the same thing as proof that a circuit breaker opened."
+        },
+        {
+          "type": "paragraph",
+          "text": "Siemens describes SIPROTEC 7SJ85 as an overcurrent-protection device for feeders, lines and capacitor banks, with a modular structure and the DIGSI 5 engineering environment. Its functions and I/O depend on the actual configuration. This is a real product example, not a statement that 7SJ85 is the most common relay in Iran. [V16.]"
+        },
+        {
+          "type": "paragraph",
+          "text": "Manufacturer illustrated product reference: SIPROTEC 7SJ85"
+        },
+        {
+          "type": "paragraph",
+          "text": "A beginner should distinguish measured current/voltage inputs, configured protection logic, a trip request, the trip circuit, the breaker mechanism and breaker-position feedback. Those stages can fail differently. An engineering change to a protection setting can alter the response to a real electrical fault, even when every network connection remains healthy."
+        },
+        {
+          "type": "paragraph",
+          "text": "The supplied ICS410 characterises some smart field-device logic as fixed. Treat that as a simplifying description, not a universal rule for all modern IEDs. The manufacturer’s documented engineering and configuration functions matter. For a security assessment, ask what settings and logic are configurable, which interfaces permit the change, what authority is required and what evidence is retained. [S410.1, PDF 34, printed 32; V16.]"
+        },
+        {
+          "type": "paragraph",
+          "text": "A suitable first exercise is to classify an offline event timeline and identify what evidence would establish a setting change, a protection pickup, a trip command or a confirmed breaker transition. Do not infer all four from one log entry. Actual protection-setting design, testing and approval require qualified electrical/protection engineering and are outside the authority conferred by this course."
+        }
+      ]
+    },
+    "E13": {
+      "title": "E13. Worked advisory — Why the hardware revision belongs in the inventory",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Siemens advisory SSA-128393, dated 10 December 2024, concerns firmware confidentiality in SICAM A8000 CP-8031/CP-8050. It describes a physical-access prerequisite and states that affected CPCI85 firmware versions below V05.30 need updating. Crucially, its additional information requires specified hardware variants to be revision JJ or later for the update to be effective. Both hardware and firmware conditions matter. [V15.]"
+        },
+        {
+          "type": "paragraph",
+          "text": "The cited variants include CP-8050 6MF28050AA00 and the conformal-coated 6MF28050AC00, along with the corresponding CP-8031 variants. This is a bounded advisory about identified hardware and firmware, not proof of a remotely exploitable command path or a demonstrated power outage."
+        },
+        {
+          "type": "paragraph",
+          "text": "For an original tabletop example, compare two fictional inventory records. Both say CP-8050 and both list firmware V05.30. Record A documents hardware revision HH. Record B documents JJ. A check that evaluates only firmware would treat them alike, while the advisory requires different conclusions. If the hardware revision is unknown, the proper result is “verification required,” not “not affected.”"
+        },
+        {
+          "type": "paragraph",
+          "text": "The exercise is entirely documentary. No physical probing or exploitation is required. The engineering response should confirm the exact asset and application, assess exposure and consequence, preserve configuration and recovery material, and plan any necessary work under authorised change control. The lesson is broader than this one vulnerability: family name, firmware and hardware revision are separate dimensions of applicability."
+        }
+      ]
+    },
+    "E14": {
+      "title": "E14. What to capture during a supervised equipment walkthrough",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Start with the process function and responsible engineer, not a shopping list of labels. Record the tag and role, then the verified manufacturer, family, order/type code, hardware revision, firmware and options. Note how identity was established: a legible approved photograph, configuration export, maintenance record or a documented passive observation can support different levels of confidence."
+        },
+        {
+          "type": "paragraph",
+          "text": "Next trace signal, power and communication relationships. Identify the source of a measurement, the channel and scaling location, the actuator demand path, feedback, shared supplies, engineering access and time sources. Record the approved source of truth for configuration and the evidence needed to validate a restoration."
+        },
+        {
+          "type": "paragraph",
+          "text": "Finally connect the asset to a question in the CMF: what activity or failure do we need to detect, which record should show it, where does that record reside, and has its collection been tested? Leave unknown fields explicit. An accurate small inventory with process relationships is more useful than a large spreadsheet of guesses. [S515.2, PDF 166 and 177–185.]"
+        }
+      ]
+    }
+  },
+  "glossary": [
+    [
+      "Process",
+      "فرآیند",
+      "The physical operation being measured or controlled."
+    ],
+    [
+      "Continuous process",
+      "فرآیند پیوسته",
+      "Material or energy can flow while control continues."
+    ],
+    [
+      "Batch process",
+      "فرآیند ناپیوسته / بچ",
+      "A bounded quantity progresses through defined steps."
+    ],
+    [
+      "Discrete process",
+      "فرآیند گسسته",
+      "Operations on countable items or distinct events."
+    ],
+    [
+      "Instrumentation",
+      "ابزار دقیق",
+      "Measurement instruments and their associated signal paths."
+    ],
+    [
+      "Sensor",
+      "حسگر",
+      "Element that responds to a physical property."
+    ],
+    [
+      "Transmitter",
+      "ترانسمیتر / فرستنده اندازه‌گیری",
+      "Device that represents a measurement as a usable signal."
+    ],
+    [
+      "Transducer",
+      "مبدل",
+      "Device converting one physical form or quantity into another."
+    ],
+    [
+      "Actuator",
+      "عملگر",
+      "Converts a command and available energy into action."
+    ],
+    [
+      "Final control element",
+      "عنصر نهایی کنترل",
+      "Element that directly changes the process input or flow."
+    ],
+    [
+      "Control valve",
+      "شیر کنترلی",
+      "Valve used to vary a process flow."
+    ],
+    [
+      "Variable-frequency drive (VFD)",
+      "درایو فرکانس متغیر",
+      "Motor-drive equipment; command is not proof of shaft motion."
+    ],
+    [
+      "Flow rate",
+      "دبی",
+      "Volume or mass passing per unit time; state the units."
+    ],
+    [
+      "Level",
+      "سطح",
+      "Height of material relative to a defined reference."
+    ],
+    [
+      "Pressure",
+      "فشار",
+      "Force per unit area; distinguish absolute and gauge context."
+    ],
+    [
+      "Engineering units",
+      "واحدهای مهندسی",
+      "Physical units attached to a represented quantity."
+    ],
+    [
+      "Measurement range",
+      "بازه اندازه‌گیری",
+      "Specified low and high measurement endpoints."
+    ],
+    [
+      "Span",
+      "اسپن / پهنای بازه",
+      "Difference between high and low endpoints."
+    ],
+    [
+      "Calibration",
+      "کالیبراسیون",
+      "Relationship of an indication to an established reference."
+    ],
+    [
+      "Live zero",
+      "صفر زنده",
+      "Nonzero signal representing the low measurement endpoint."
+    ],
+    [
+      "Scaling",
+      "مقیاس‌گذاری",
+      "Conversion between signal or raw code and engineering units."
+    ],
+    [
+      "Signal quality",
+      "کیفیت / اعتبار سیگنال",
+      "Reported validity context; not a guarantee of physical truth."
+    ],
+    [
+      "Analog input (AI)",
+      "ورودی آنالوگ",
+      "Controller input representing a continuously variable quantity."
+    ],
+    [
+      "Analog output (AO)",
+      "خروجی آنالوگ",
+      "Controller output representing a variable command."
+    ],
+    [
+      "Digital input (DI)",
+      "ورودی دیجیتال",
+      "Input interpreted as discrete state, often Boolean."
+    ],
+    [
+      "Digital output (DO)",
+      "خروجی دیجیتال",
+      "Output representing discrete command state."
+    ],
+    [
+      "Setpoint (SP)",
+      "مقدار مرجع / نقطه تنظیم",
+      "Target used by the control calculation."
+    ],
+    [
+      "Process variable (PV)",
+      "متغیر فرآیندی",
+      "Process quantity used by the controller as feedback."
+    ],
+    [
+      "Manipulated variable (MV)",
+      "متغیر دستکاری‌شونده",
+      "Quantity adjusted by the controller to affect the process."
+    ],
+    [
+      "Feedback",
+      "بازخورد",
+      "Measured response returned to the decision calculation."
+    ],
+    [
+      "Control loop",
+      "حلقه کنترل",
+      "Measurement, decision and action path around a process."
+    ],
+    [
+      "Open-loop control",
+      "کنترل حلقه باز",
+      "Action without feedback correction of the controlled result."
+    ],
+    [
+      "Closed-loop control",
+      "کنترل حلقه بسته",
+      "Action adjusted using feedback from the result."
+    ],
+    [
+      "Proportional gain",
+      "بهره تناسبی",
+      "Strength of the response to present error; units matter."
+    ],
+    [
+      "Integral action",
+      "عمل انتگرالی",
+      "Response based on accumulated error over time."
+    ],
+    [
+      "Derivative action",
+      "عمل مشتقی",
+      "Response related to change rate; implementation details matter."
+    ],
+    [
+      "Saturation",
+      "اشباع",
+      "A command or signal has reached an imposed limit."
+    ],
+    [
+      "Anti-windup",
+      "جلوگیری از انباشت انتگرال",
+      "Measures limiting harmful integral accumulation at constraints."
+    ],
+    [
+      "Manual mode",
+      "حالت دستی",
+      "An operator or other selected source provides the command."
+    ],
+    [
+      "Automatic mode",
+      "حالت خودکار",
+      "The configured automatic calculation provides the command."
+    ],
+    [
+      "Alarm",
+      "هشدار",
+      "Notification of a condition requiring attention or response."
+    ],
+    [
+      "Permissive",
+      "شرط مجازکننده",
+      "Condition required to allow a defined action."
+    ],
+    [
+      "Interlock",
+      "اینترلاک / قفل منطقی",
+      "Logic that prevents or enforces a defined action."
+    ],
+    [
+      "Trip",
+      "تریپ / فرمان توقف حفاظتی",
+      "Protective action; the exact meaning is system-specific."
+    ],
+    [
+      "Basic process control system (BPCS)",
+      "سامانه کنترل پایه فرآیند",
+      "System performing normal process-control functions."
+    ],
+    [
+      "Safety instrumented system (SIS)",
+      "سامانه ابزار دقیق ایمنی",
+      "System implementing specified safety instrumented functions."
+    ],
+    [
+      "Safety instrumented function (SIF)",
+      "تابع ابزار دقیق ایمنی",
+      "Specified protective function within a safety lifecycle."
+    ],
+    [
+      "Safety integrity level (SIL)",
+      "سطح یکپارچگی ایمنی",
+      "Functional-safety concept; not a cybersecurity security level."
+    ],
+    [
+      "Security level",
+      "سطح امنیت",
+      "Security capability or target context; not a SIL."
+    ],
+    [
+      "Programmable logic controller (PLC)",
+      "کنترل‌گر منطقی برنامه‌پذیر",
+      "Industrial controller executing a configured control program."
+    ],
+    [
+      "Distributed control system (DCS)",
+      "سامانه کنترل توزیع‌شده",
+      "Integrated distributed process-control environment."
+    ],
+    [
+      "SCADA",
+      "کنترل نظارتی و گردآوری داده",
+      "Supervisory control and data-acquisition role or system."
+    ],
+    [
+      "Human-machine interface (HMI)",
+      "رابط انسان و ماشین",
+      "Operator-facing display and interaction function."
+    ],
+    [
+      "Engineering workstation",
+      "ایستگاه مهندسی",
+      "System used for engineering, configuration or maintenance."
+    ],
+    [
+      "Historian",
+      "تاریخچه‌نگار داده‌های فرآیندی",
+      "System storing time-related process information."
+    ],
+    [
+      "Remote terminal unit (RTU)",
+      "واحد پایانه راه‌دور",
+      "Field/remote telemetry and control unit."
+    ],
+    [
+      "Intelligent electronic device (IED)",
+      "تجهیز الکترونیکی هوشمند",
+      "Common power-system term; specific protection/control roles vary."
+    ],
+    [
+      "P&ID",
+      "نمودار لوله‌کشی و ابزار دقیق",
+      "Engineering drawing whose symbols and conventions need a legend."
+    ],
+    [
+      "Instrument tag",
+      "تگ ابزار دقیق",
+      "Identifier linked to engineering and operational records."
+    ],
+    [
+      "I/O list",
+      "فهرست ورودی‌ها و خروجی‌ها",
+      "Record mapping signals, channels, tags and meanings."
+    ],
+    [
+      "Process image",
+      "تصویر فرآیند",
+      "Controller memory representation of I/O; behavior is vendor-specific."
+    ],
+    [
+      "Scan cycle",
+      "چرخه اسکن",
+      "Repeated execution concept; not all tasks share one universal order."
+    ],
+    [
+      "Timestamp",
+      "مهر زمانی",
+      "Time associated with data; origin and clock quality matter."
+    ],
+    [
+      "Stale data",
+      "داده به‌روزنشده / کهنه",
+      "Value whose source update is too old for its intended use."
+    ],
+    [
+      "Redundancy",
+      "افزونگی",
+      "Additional resources intended to support continuity or tolerance."
+    ],
+    [
+      "Failover",
+      "انتقال به واحد پشتیبان",
+      "Transition from an active resource to a replacement."
+    ],
+    [
+      "Common-cause failure",
+      "خرابی با علت مشترک",
+      "One cause affects multiple otherwise separate resources."
+    ],
+    [
+      "Management of change (MOC)",
+      "مدیریت تغییر",
+      "Controlled evaluation and approval of a proposed change."
+    ],
+    [
+      "Zone",
+      "ناحیه امنیتی",
+      "Grouping defined by security requirements and risk context."
+    ],
+    [
+      "Conduit",
+      "گذرگاه ارتباطی",
+      "Defined communication connection between security zones."
+    ],
+    [
+      "Voltage",
+      "ولتاژ؛ اختلاف پتانسیل",
+      "Electrical potential difference between two points."
+    ],
+    [
+      "Electric current",
+      "جریان الکتریکی",
+      "Rate of charge flow; expressed in amperes."
+    ],
+    [
+      "Resistance",
+      "مقاومت الکتریکی",
+      "Opposition to current in the stated circuit model."
+    ],
+    [
+      "Voltage margin",
+      "حاشیه ولتاژ",
+      "Available supply minus the calculated required voltage."
+    ],
+    [
+      "Loop burden",
+      "بار الکتریکی حلقه",
+      "Electrical load that contributes to loop voltage requirements."
+    ],
+    [
+      "Loop-powered transmitter",
+      "ترانسمیتر با تغذیه از حلقه",
+      "Transmitter powered through its measurement-loop connection."
+    ],
+    [
+      "Dry contact",
+      "کنتاکت خشک",
+      "Contact that does not itself provide the sensing voltage."
+    ],
+    [
+      "Sourcing output",
+      "خروجی تأمین‌کننده جریان",
+      "Output described by the direction in which it supplies current."
+    ],
+    [
+      "Sinking output",
+      "خروجی جذب‌کننده جریان",
+      "Output described by the current path it provides toward a reference."
+    ],
+    [
+      "Lead resistance",
+      "مقاومت سیم رابط",
+      "Resistance contributed by the sensor or instrument conductors."
+    ],
+    [
+      "RTD",
+      "حسگر دمایی مقاومتی",
+      "Resistance temperature detector; distinct from its transmitter."
+    ],
+    [
+      "Thermocouple",
+      "ترموکوپل",
+      "Temperature-sensing element based on a thermoelectric relationship."
+    ],
+    [
+      "Thermowell",
+      "ترموول؛ غلاف محافظ حسگر",
+      "Protective physical interface used with a temperature sensor."
+    ],
+    [
+      "Positioner",
+      "پوزیشنر؛ موقعیت‌دهنده شیر",
+      "Instrument that regulates actuator response using position feedback."
+    ],
+    [
+      "Valve travel",
+      "کورس حرکت شیر",
+      "Valve movement or position; not the same quantity as flow."
+    ],
+    [
+      "Gauge pressure",
+      "فشار گیج",
+      "Pressure referenced to local atmospheric pressure."
+    ],
+    [
+      "Absolute pressure",
+      "فشار مطلق",
+      "Pressure referenced to vacuum."
+    ],
+    [
+      "Differential pressure",
+      "فشار تفاضلی",
+      "Difference between two pressures."
+    ],
+    [
+      "Configured span",
+      "گستره تنظیم‌شده",
+      "Difference between configured upper and lower endpoints."
+    ],
+    [
+      "Quantisation",
+      "کوانتیزه‌سازی",
+      "Representation using a finite set of numerical levels."
+    ],
+    [
+      "As-found condition",
+      "وضعیت پیش از تنظیم",
+      "Recorded condition before an intervention or adjustment."
+    ],
+    [
+      "As-left condition",
+      "وضعیت پس از تنظیم",
+      "Recorded condition after the intervention is completed."
+    ],
+    [
+      "Nameplate",
+      "پلاک مشخصات",
+      "Physical identification marking; not a complete configuration record."
+    ],
+    [
+      "Article / order number",
+      "شماره سفارش",
+      "Manufacturer identifier used to distinguish product variants."
+    ],
+    [
+      "Hardware revision",
+      "بازبینی سخت‌افزار",
+      "Hardware version relevant to compatibility and some advisories."
+    ],
+    [
+      "Source timestamp",
+      "زمان ثبت در مبدأ",
+      "Time assigned at the original measurement or event source."
+    ],
+    [
+      "Ingestion timestamp",
+      "زمان دریافت در سامانه",
+      "Time the collecting system receives or accepts a record."
+    ],
+    [
+      "Shared dependency",
+      "وابستگی مشترک",
+      "Upstream component or condition affecting multiple observations or functions."
+    ],
+    [
+      "CMF",
+      "چارچوب مدیریت جمع‌آوری داده",
+      "Collection Management Framework linking requirements, evidence and validation."
+    ],
+    [
+      "Observed retention",
+      "مدت نگهداری مشاهده‌شده",
+      "Actual available time window, distinguished from a policy requirement."
+    ],
+    [
+      "Collection validation",
+      "اعتبارسنجی جمع‌آوری داده",
+      "Testing whether the required evidence is actually present and usable."
+    ],
+    [
+      "Bounded negative evidence",
+      "شواهد منفی با دامنه مشخص",
+      "No finding within stated data, time and detection limits; not universal absence."
+    ]
+  ],
+  "references": [
+    "Reference numbers beside claims link to the entries below. Each external link opens the listed primary source. Publication dates and access limitations are recorded separately. Research date: 15 October 2026. Original model calculations, diagrams and exercises are identified as authored examples rather than sourced plant observations.",
+    "[R01] NIST. SP 800-82 Rev. 3: Guide to Operational Technology (OT) Security",
+    "September 2023; final. Public publication record and abstract. Final baseline; not a statement that all later drafts are binding. Open primary source",
+    "[R02] NIST. SP 800-82 Rev. 4: Initial Public Draft",
+    "21 September 2026; draft. Public draft record. Kept separate from the final reference baseline. Open primary source",
+    "[R03] IEC. IEC 62443-2-1:2024",
+    "7 August 2024; edition 2. Public catalogue/abstract only; asset-owner security-program scope. Full paid text not reviewed. Open primary source",
+    "[R04] IEC. IEC 62443-2-4:2023",
+    "2023. Public catalogue/abstract only; IACS service-provider security-program requirements. Open primary source",
+    "[R05] IEC. IEC 62443-3-2:2020",
+    "24 June 2020. Public abstract verifies system scope, zones/conduits, risk assessment and target security levels. Open primary source",
+    "[R06] IEC. IEC 62443-3-3:2013",
+    "7 August 2013; catalogue also lists 2014 corrigendum. Public abstract verifies system security requirements and capability security levels; not a full clause audit. Open primary source",
+    "[R07] IEC. IEC 61508-1:2010",
+    "2010; edition 2. Public catalogue/abstract. The verified published Part 1 baseline, not a claim of complete access to the series. Open primary source",
+    "[R08] IEC. IEC 61511-1:2016+AMD1:2017 CSV",
+    "16 August 2017 consolidated publication. Public catalogue/abstract. Process-sector SIS lifecycle scope; full standard not reviewed. Open primary source",
+    "[R09] IEC. IEC 61131-3:2025",
+    "22 May 2025. Public abstract confirms Structured Text, Ladder Diagram and Function Block Diagram. Open primary source",
+    "[R10] ISA. ANSI/ISA-5.1-2024: Instrumentation and Control - Symbols and Identification",
+    "2024. Public catalogue. Drawings in this book are original explanatory schematics, not reproductions of the standard. Open primary source",
+    "[R11] MITRE. ATT&CK Version History",
+    "v20.0 current from 13 October 2026. Version record inspected; technique mappings must be checked against their individual entries when developed. Open primary source",
+    "[R12] CISA. ICS Recommended Practices",
+    "Live collection; reviewed 15 October 2026. Discovery/reference hub. Individual documents have their own publication dates; no claim all are newly revised. Open primary source",
+    "[R13] CISA. ICS Advisories",
+    "Live collection; reviewed 15 October 2026. Advisory lookup baseline, not a complete vulnerability inventory for any vendor. Open primary source",
+    "[R14] NI. 4-20 mA Current Loop Fundamentals, System Design, and Setup",
+    "Page shows update 3 February 2025. Manufacturer explanation of the current loop and live zero. Book calculations and numerical examples are original. Open primary source",
+    "[R15] Fluke. What Is a 4-20 mA Current Loop?",
+    "Undated page; reviewed 15 October 2026. Manufacturer explanation of live zero, loop faults and HART overlay. No particular field wiring is authorized. Open primary source",
+    "[R16] NI. The PID Controller & Theory Explained",
+    "Page shows update 7 March 2025. Conceptual PID reference. Tank dynamics, tuning numbers and simulation results are authored examples. Open primary source",
+    "[R17] Siemens. S7-1200 G2: Execution of the user program",
+    "Online manual collection version 20; reviewed 15 October 2026. Vendor-specific process-image and execution explanation. Not generalized into a universal scan order. Open primary source",
+    "[R18] Siemens. Totally Integrated Automation Portal",
+    "Live product page; reviewed 15 October 2026. Engineering ecosystem reference. No assumption that every STEP 7 or PCS 7 project uses TIA Portal. Open primary source",
+    "[R19] Siemens. SIMATIC PCS 7 - Distributed Control System",
+    "Live page advertises V10.0; reviewed 15 October 2026. Product generation example only; latest service pack, support matrix and installed versions not established here. Open primary source",
+    "[R20] ABB. AC 800M Controllers",
+    "Live product page; reviewed 15 October 2026. Controller ecosystem and Control Builder context. Compatibility and safety claims require model-specific documents. Open primary source",
+    "[R21] Yokogawa. CENTUM VP",
+    "Live product page presents R7; reviewed 15 October 2026. Current product positioning; vendor capability claims are not independent validation or evidence of a local installed release. Open primary source",
+    "[R22] Siemens Energy. Omnivise T3000 control system",
+    "Live product page; reviewed 15 October 2026. Confirms the current Omnivise T3000 name and historical SPPA-T3000 relationship. Open primary source",
+    "[R23] MECO / MAPNA Electric & Control. Automation and process control / MAPCS",
+    "Undated product page; reviewed 15 October 2026. Manufacturer product description. Public release matrix and detailed security documentation remain research gaps. Open primary source",
+    "[R24] MECO. Parand combined-cycle steam unit synchronized using MAPCS",
+    "7 April 2020 / 19 Farvardin 1399. Manufacturer-reported operational milestone; evidence category 2, not independent owner acceptance documentation. Open primary source",
+    "[R25] MAPNA Group. Final acceptance of the third Parand combined-cycle steam unit",
+    "28 July 2024. Manufacturer/project-group report describes installed MAPCS alongside Siemens controls; exact Siemens family is not named in that statement. Open primary source",
+    "[R26] Raybod Fanavar. Project references",
+    "Undated page; reviewed 15 October 2026. Contractor/expert project list; category 2 with qualification. Descriptions are not independent commissioning certificates and some project labels are inconsistent. Open primary source",
+    "[R27] Smart Automation. Experience / project references",
+    "Undated page; reviewed 15 October 2026. Contractor claims include Iranian AC800F/Tenore and Plantguard contexts. Historical dates and current configurations not established. Open primary source",
+    "[R28] Syscont. 1993-1999 Bandar Abbas Refinery - with Honeywell Austria and Italy",
+    "Project period 1993-1999; page date not established. Historical contractor DCS reference. Does not establish Experion, C300, or a current safety-system generation. Open primary source",
+    "[R29] ATRO Control. Pars Petrochemical project",
+    "Undated; indexed excerpt reviewed 15 October 2026. Primary contractor search excerpt names CENTUM VP and InTouch. Full-page retrieval failed; family-level lead is provisional. Open primary source",
+    "[R30] Modbus Organization. Modbus Specifications",
+    "Live specifications hub; reviewed 15 October 2026. Distinguishes Modbus Security from traditional Modbus. Detailed packet work is scheduled for Chapter 9. Open primary source",
+    "[R31] UK Health and Safety Executive. About Electrical, Control and Instrumentation",
+    "31 January 2025 page date. Connects IACS cybersecurity with basic control and instrumented safety. UK guidance is not asserted to be Iranian law. Open primary source",
+    "[R32] IEC. IEC 61511:2026 SER - all-parts bundle",
+    "10 July 2026 catalogue bundle. The 2026 bundle includes the 2016+2017 Part 1. A bundle date is not a new edition of every component standard. Open primary source",
+    "[R33] ISA. ISA5.1 committee purpose",
+    "Undated; reviewed 15 October 2026. Public explanation of instrument symbols and identification. Open primary source",
+    "[R34] NI. Advantages of the 4-20mA Range for NI Industrial Analog Inputs",
+    "7 November 2023. Manufacturer note on current signaling and open-circuit indication. Open primary source",
+    "The SANS locators are defined in the preceding source integration register. V01–V16 identify the independently researched manufacturer/protocol sources used in the new material. Model-specific implementation and firmware were not tested.",
+    "V01 — Emerson — Rosemount 3051 pressure transmitter family",
+    "Manufacturer family page checked 15 October 2026. Used for inline/coplanar relationships, measurement applications and output-option distinctions. The 3051T image identity was checked online; its bytes could not be downloaded for DOCX embedding. Not an installed-device configuration or firmware audit. Open primary source",
+    "V02 — Emerson — Rosemount 3144P temperature transmitter family",
+    "Manufacturer family page and product image checked 15 October 2026. Used for transmitter role, housing, diagnostics and option distinctions. No particular site's sensor or backup configuration was verified. Open primary source",
+    "V03 — Emerson — Fisher FIELDVUE DVC6200",
+    "Manufacturer product page and image checked 15 October 2026. Used for the digital valve-controller/positioner role, HART and linkage-less feedback. This is not a specification of a complete installed valve assembly. Open primary source",
+    "V04 — Siemens SiePortal — CPU 1511-1 PN",
+    "Manufacturer catalogue checked 15 October 2026. Used for the CPU's S7-1500 role, central/distributed I/O and PROFINET interface. Optional runtime features are not assumed enabled. Open primary source",
+    "V05 — Siemens — S7-1500/ET 200MP manual collection, CPU technical data",
+    "V20 manual collection, June 2025; checked 15 October 2026. Used to verify CPU 1511-1 PN article 6ES7511-1AL03-0AB0. A dated documentation snapshot, not a blanket latest-firmware or lifecycle claim. Open primary source",
+    "V06 — Siemens — S7-1200 G2 CPU ordering information",
+    "V20, December 2024; checked 15 October 2026. Used for CPU 1214C/1214FC electrical variants and order numbers. The examples are not an exhaustive list of every subsequently released G2 CPU. Open primary source",
+    "V07 — Siemens — SIMATIC S7-1200 G2 product and compatibility information",
+    "Checked 15 October 2026. Used for the explicit lack of hardware compatibility with the previous S7-1200 family and the distinction between program migration and hardware migration; also for described NFC/web capabilities. Actual enabled services remain installation-specific. Open primary source",
+    "V08 — Siemens SiePortal — SIMATIC ET 200SP",
+    "Checked 15 October 2026. Used for modular remote-I/O architecture, IM 155-6 PN/DP/MF distinctions and controller-based head-end alternatives. Exact module, base-unit and firmware compatibility not established for a site. Open primary source",
+    "V09 — ABB — AC 800M controllers",
+    "Checked 15 October 2026. Manufacturer description of modular hardware and CPU-family differences, including PM866A. Not evidence that every CPU supports the same redundancy or safety application. Open primary source",
+    "V10 — ABB — ACS880-01 wall-mounted single drives",
+    "Checked 15 October 2026. Used for drive role, form factor, direct torque control and configurable integration. No drive sizing, wiring, live parameter change or safety validation is prescribed. Open primary source",
+    "V11 — FieldComm Group — HART Technology Explained",
+    "Protocol-owner explanation checked 15 October 2026. Used for conventional wired HART's analog and digital channels. The text does not extrapolate a point-to-point analog loop into every HART mode or transport. Open primary source",
+    "V12 — Siemens — MTP700/MTP1000/MTP1200 Unified Comfort technical specifications",
+    "English V20 documentation, December 2024, checked 15 October 2026. MTP700 family/size also corroborated against the V21 December 2025 German technical-specification page. Used only for identity/format distinctions, not to assert that V20 is the latest runtime. Open primary source",
+    "V13 — Siemens — MTP400/MTP700 Unified Basic technical specifications",
+    "V21, December 2025; checked 15 October 2026. Used to establish that MTP700 without a family designation is ambiguous between product lines. Open primary source",
+    "V14 — Moxa — EDS-4008 series and support-document listing",
+    "Manufacturer series description and indexed official support listing checked 15 October 2026; data sheet listing v1.8 dated 2 June 2026. Used for variant-dependent port options and documentation matching. No exact native log schema or feature-enable state was tested. Open primary source",
+    "V15 — Siemens ProductCERT — SSA-128393",
+    "V1.0, published and last updated 10 December 2024; checked 15 October 2026. CVE-2024-53832. Used for the exact affected CPCI85 firmware boundary and JJ-or-later hardware condition for listed CP-8031/CP-8050 variants. Document analysis only; no exploit was performed. Open primary source",
+    "V16 — Siemens — SIPROTEC 7SJ85",
+    "Manufacturer description checked 15 October 2026. Used for overcurrent protection, application categories, modular architecture and DIGSI 5 relationship. Not evidence of national prevalence or an approved protection application. Open primary source"
+  ]
+}

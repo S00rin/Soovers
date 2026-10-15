@@ -16,6 +16,7 @@ COPY --from=build --chown=node:node /app/local-dist ./local-dist
 COPY --chown=node:node server ./server
 COPY --chown=node:node migrations ./migrations
 COPY --chown=node:node lib/education/f5-course.ts ./lib/education/f5-course.ts
+COPY --chown=node:node lib/ics ./lib/ics
 COPY --chown=node:node scripts/admin.mjs scripts/backup.mjs scripts/restore.mjs ./scripts/
 RUN mkdir /app/data && chown node:node /app/data
 ENV DATABASE_PATH=/app/data/academy.sqlite

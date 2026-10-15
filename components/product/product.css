@@ -1044,3 +1044,5 @@
     font-size: 10px;
   }
 }
+
+.ics-course-feature{display:grid;grid-template-columns:1.4fr 1fr;gap:30px;align-items:center;padding:32px;background:linear-gradient(110deg,#183b3a,#15272c);border:1px solid #46746b;border-radius:16px;margin:24px 0;color:#e7f3ee}.ics-course-feature h2{font-size:27px;margin:13px 0}.ics-course-feature p{line-height:2;color:#b6cec7;font-size:14px;max-width:580px}.ics-course-feature small{display:block;margin-top:14px;color:#a5c5bb;font-size:11px}.ics-course-feature a{margin-top:15px;display:inline-flex;text-decoration:none}.ics-course-symbol{text-align:center;font:80px ui-monospace,monospace;color:#83d8c1;letter-spacing:5px}.ics-course-symbol span{display:block;font:9px ui-monospace,monospace;letter-spacing:2px;margin-top:17px;color:#b4c9c2}@media(max-width:760px){.ics-course-feature{grid-template-columns:1fr;padding:23px}.ics-course-symbol{display:none}.ics-course-feature h2{font-size:23px}}

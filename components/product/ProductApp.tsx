@@ -40,6 +40,7 @@ import {
 } from "@/lib/education/f5-course";
 import "./product.css";
 const Academy = lazy(() => import("../education/F5Academy"));
+const Industrial = lazy(() => import("../ics/IcsAcademy"));
 const Tower = lazy(() => import("../tower/TowerApp"));
 const fa = (value: number) => value.toLocaleString("fa-IR");
 const message = (error: unknown) =>
@@ -126,7 +127,7 @@ export default function ProductApp() {
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, [route]);
-  const preview = route === "#tower" || route === "#demo";
+  const preview = route === "#tower" || route === "#demo" || route === "#ics-demo";
   useEffect(() => {
     if (!preview) void refresh();
   }, [preview, refresh]);
@@ -279,7 +280,7 @@ export default function ProductApp() {
       setBusy(false);
     }
   };
-  if (route === "#tower" || route === "#demo")
+  if (route === "#tower" || route === "#demo" || route === "#ics-demo")
     return (
       <ProductBoundary>
         <div className="preview-bar">
@@ -289,7 +290,7 @@ export default function ProductApp() {
           </a>
         </div>
         <Suspense fallback={<Loading />}>
-          {route === "#tower" ? <Tower /> : <Academy />}
+          {route === "#tower" ? <Tower /> : route === "#ics-demo" ? <Industrial /> : <Academy />}
         </Suspense>
       </ProductBoundary>
     );
@@ -315,6 +316,7 @@ export default function ProductApp() {
         }}
       />
     );
+  if (route === "#ics") return <ProductBoundary><Suspense fallback={<Loading />}><Industrial key={user.id} account={user} /></Suspense></ProductBoundary>;
   if (route === "#academy" && course)
     return (
       <ProductBoundary>
@@ -388,6 +390,7 @@ export default function ProductApp() {
                 پیشرفت متصل به حساب
               </span>
             </div>
+            <section className="ics-course-feature"><div><span className="product-kicker">INDUSTRIAL SYSTEMS / NEW ACADEMY</span><h2>آکادمی سیستم‌های کنترل صنعتی</h2><p>از مخزن و حلقهٔ کنترل تا تجهیزات واقعی و تحلیل شواهد. ۱۰ درس فارسی، متن عمیق کتاب، ۱۲ تجهیز و سه میز تمرین.</p><a className="product-primary" href="#ics">شروع آکادمی صنعتی <ArrowLeft size={18}/></a><small>تمام درس‌ها آزاد؛ تعیین سطح و ارزیابی اختیاری</small></div><div className="ics-course-symbol" aria-hidden="true">ICS<span>PROCESS → SIGNAL → CONTROL</span></div></section>
             <section className="enrolled-course">
               <div className="course-art" aria-hidden="true">
                 <span>f5</span>
@@ -642,24 +645,25 @@ function Landing({
             <span /> LEARN. INVESTIGATE. DEFEND.
           </span>
           <h1>
-            دانش شبکه را
+            سیستم صنعتی را
             <br />
-            به <em>مهارت واقعی</em>
+            با <em>درک فرایند</em>
             <br />
-            تبدیل کن.
+            بشناس.
           </h1>
           <p className="landing-description">
-            دستگاه را از نزدیک بشناس. شواهد را کنار هم بگذار.
+            از مخزن و حسگر تا PLC و شواهد امنیتی.
             <br />
-            با هر تصمیم، یک قدم به تحلیلگر بهتر بودن نزدیک شو.
+            آموزش کنترل صنعتی و F5؛ با تمرین و پیشرفت ذخیره‌شده.
           </p>
+          <a className="product-primary" href="#ics-demo">دیدن آکادمی صنعتی بدون ثبت‌نام <ArrowLeft size={17}/></a>
           <div className="landing-device" aria-hidden="true">
             <div className="device-label">
-              <span>F5 BIG-IP</span>
+              <span>ICS / INDUSTRIAL SYSTEMS</span>
               <span>INTERACTIVE LEARNING / 01</span>
             </div>
             <div className="device-body">
-              <strong>f5</strong>
+              <strong>ICS</strong>
               <div className="device-vents">
                 {Array.from({ length: 14 }, (_, i) => (
                   <i key={i} />
@@ -679,13 +683,13 @@ function Landing({
           </div>
           <div className="landing-facts">
             <span>
-              <b>۰۶</b>بخش تخصصی
+              <b>۱۰</b>درس صنعتی
             </span>
             <span>
-              <b>۰۳</b>پروندهٔ تعاملی
+              <b>۱۲</b>پروفایل تجهیز
             </span>
             <span>
-              <b>۳۶</b>دقیقه یادگیری
+              <b>۰۳</b>میز تمرین
             </span>
           </div>
         </section>

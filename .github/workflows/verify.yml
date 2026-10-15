@@ -22,6 +22,7 @@ jobs:
       - run: pnpm build:demo
       - run: pnpm test:server
       - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:ics:browser
       - run: pnpm test:product
       - run: pnpm test:f5:browser
       - run: pnpm test:browser

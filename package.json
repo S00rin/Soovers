@@ -12,17 +12,19 @@
     "build:selfhost": "vite build --config vite.local.config.ts",
     "start": "node server/index.mjs",
     "check": "tsc --noEmit",
-    "test": "node scripts/test-soovers-motion.mjs && node scripts/test-campus.mjs && node scripts/test-learning.mjs && node scripts/test-f5.mjs",
+    "test": "node scripts/test-soovers-motion.mjs && node scripts/test-campus.mjs && node scripts/test-learning.mjs && node scripts/test-f5.mjs && node --test scripts/test-ics.mjs",
     "test:f5:browser": "node scripts/test-f5-browser.mjs",
     "package:demo": "pnpm build:demo && python3 scripts/package-demo.py",
     "test:browser": "node scripts/test-browser.mjs",
     "test:server": "node scripts/test-server.mjs",
     "start:demo": "node scripts/serve.mjs",
-    "test:api": "node --test scripts/test-api.mjs",
+    "test:api": "node --test scripts/test-api.mjs scripts/test-ics-api.mjs",
     "test:product": "node scripts/test-product-browser.mjs",
     "admin": "node scripts/admin.mjs",
     "backup": "node scripts/backup.mjs",
-    "build:demo": "node scripts/build-demo.mjs"
+    "build:demo": "node scripts/build-demo.mjs",
+    "test:ics": "node --test scripts/test-ics.mjs scripts/test-ics-api.mjs",
+    "test:ics:browser": "node scripts/test-ics-browser.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

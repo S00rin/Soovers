@@ -1,4 +1,5 @@
 import http from "node:http";
+import { handleIcs } from "./ics.mjs";
 import path from "node:path";
 import { readFile, stat } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
@@ -338,6 +339,7 @@ export async function createApplication({
         });
         return json(200, { ok: true }, { "Set-Cookie": cookie(session) });
       }
+      if (await handleIcs({route,db,user,req,body,json,fail})) return;
       if (route === "GET /api/course")
         return json(200, { course: course(user.id) });
       if (route === "POST /api/course/enroll") {
