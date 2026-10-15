@@ -1,6 +1,6 @@
 # SooVers Academy
 
-A self-hosted, Persian-first academy for **industrial control systems (ICS/OT)** and F5 BIG-IP. The industrial academy combines ten Persian lessons, the uploaded student book’s original reading, twelve equipment profiles, a 102-term glossary and three interactive workbenches. Learners can study every available lesson without placement or mandatory assessment. Account progress persists across browsers and server restarts.
+A self-hosted, Persian-first academy for **industrial control systems (ICS/OT)** and F5 BIG-IP. The industrial academy offers 42 Persian lessons across 34 chapter guides in a continuous reading experience, with experiments inside lessons, saved per-lesson workbooks, twelve equipment profiles and a 102-term reference glossary. Learners can study every available lesson without placement or mandatory assessment. Account progress persists across browsers and server restarts.
 
 The editable source is now in this repository. `SooVers_Demo_0.5.0 (1).zip` remains the original, untouched demo baseline.
 
@@ -41,7 +41,9 @@ Placement and assessments are optional. Learners can enter the classroom, labora
 
 - Default static demo: ICS/OT academy. `#demo` retains the F5 preview; `#tower` opens the campus.
 - Authenticated application: choose **شروع آکادمی صنعتی**. No F5 enrollment is required. Study progress, evidence notes and optional quiz results belong to the signed-in account.
-- Delivered content: Chapters 1–2, the initial equipment atlas and glossary. The 34-chapter / 816-hour curriculum is a **development roadmap**, not a claim that all chapters are available.
+- Delivered content: ten foundation lessons adapted from the supplied Book B plus 32 original chapter guides, each with a worked example, evidence case and two reasoning decisions. The two capstones include deliverables and evaluation criteria.
+- The normal desktop/mobile route keeps reading, practice and notes together; glossary, equipment and original-book reading open beside the lesson. Links such as `#ics/lesson/drawings` resume a particular lesson.
+- The reference curriculum’s **816 hours** is a classroom-program design estimate. This web edition provides guides for all 34 chapter topics; it does not claim to deliver 816 hours, recorded classes, vendor software or physical labs.
 - [Content provenance and scope](docs/ICS_CONTENT.md) records the supplied DOCX, source section mapping, simulation assumptions and what has not been imported.
 - The downloadable **v1.0.0** release above is the earlier F5 release; use the current source or hosted demo for the new industrial content.
 

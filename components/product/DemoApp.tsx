@@ -15,9 +15,9 @@ export default function DemoApp() {
   return (
     <>
       {legacy && (
-        <div className="preview-bar">
-          <span>دموی تعاملی · بدون ثبت‌نام · ارزیابی اختیاری</span>
-          <a href="#ics">آکادمی کنترل صنعتی ←</a>
+        <div className="preview-bar course-mode-bar">
+          <span>نمای سه‌بعدی و تعاملی · مسیر مطالعهٔ معمولی هم در دسترس است</span>
+          <a href="#ics">آموزش معمولی بدون عینک ←</a>
         </div>
       )}
       <Suspense

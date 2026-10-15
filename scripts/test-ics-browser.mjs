@@ -5,7 +5,8 @@ import path from "node:path";
 import { tmpdir } from "node:os";
 import assert from "node:assert/strict";
 import { createApplication } from "../server/app.mjs";
-const dir = await mkdtemp(path.join(tmpdir(), "soovers-ics-browser-")),
+import { lessons } from "../lib/ics/content.ts";
+const dir = await mkdtemp(path.join(tmpdir(), "soovers-reader-")),
   out = path.resolve("test-results/ics");
 await mkdir(out, { recursive: true });
 const demo = "http://127.0.0.1:8096",
@@ -23,7 +24,8 @@ const app = await createApplication({
 await new Promise((r) => app.server.listen(8097, "127.0.0.1", r));
 let browser, page;
 const results = [],
-  errors = [];
+  errors = [],
+  apiRequests = [];
 const pass = (name) => {
   results.push(name);
   console.log("PASS", name);
@@ -44,50 +46,159 @@ try {
     viewport: { width: 1440, height: 1000 },
     reducedMotion: "reduce",
   });
-  const apiRequests = [];
-  page.on("request", (r) => {
-    if (r.url().includes("/api/")) apiRequests.push(r.url());
-  });
   page.on("pageerror", (e) => errors.push(e.message));
   page.on("response", (r) => {
     if (r.url().startsWith(demo) && r.status() >= 400)
       errors.push(r.status() + " " + r.url());
   });
-  const nav = async (name) =>
-    page
-      .getByRole("navigation", { name: "بخش‌های آکادمی صنعتی" })
-      .getByRole("button", { name, exact: true })
-      .click();
-  const setSlider = async (name, value) =>
-    page.getByRole("slider", { name }).evaluate((e, value) => {
+  page.on("request", (r) => {
+    if (r.url().includes("/api/")) apiRequests.push(r.url());
+  });
+  const click = async (name) =>
+    page.getByRole("button", { name, exact: true }).click();
+  const open = async (id) => {
+    await page.evaluate((id) => {
+      location.hash = "#ics/lesson/" + id;
+    }, id);
+    await expect(page.locator(".course-lesson-heading h1")).toHaveText(
+      lessons.find((l) => l.id === id).title,
+    );
+  };
+  const overflow = async () =>
+    assert.equal(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth > innerWidth + 1,
+      ),
+      false,
+    );
+  const slider = async (name, value) =>
+    page.getByRole("slider", { name }).evaluate((e, v) => {
       Object.getOwnPropertyDescriptor(
         HTMLInputElement.prototype,
         "value",
-      ).set.call(e, String(value));
+      ).set.call(e, String(v));
       e.dispatchEvent(new Event("input", { bubbles: true }));
       e.dispatchEvent(new Event("change", { bubbles: true }));
     }, value);
   await page.goto(demo);
+  await expect(page.locator(".course-cover h1")).toContainText("قدم‌به‌قدم");
   await expect(
-    page.getByRole("heading", { name: "سیستم را بفهم. بعد تحلیل کن." }),
-  ).toBeVisible();
-  await expect(page.locator(".ics-lesson-link")).toHaveCount(10);
+    page.locator(".course-sidebar .course-outline details"),
+  ).toHaveCount(34);
   await page.screenshot({
     path: path.join(out, "01-home.png"),
     fullPage: true,
   });
-  pass("Account-free ICS home exposes all ten lessons without placement");
-  await nav("درس‌ها");
+  await click("شروع یادگیری");
+  await expect(page).toHaveURL(/#ics\/lesson\/process$/);
+  await expect(page.locator("#lesson-practice .ics-lab")).toBeVisible();
+  pass(
+    "One clear course entry opens reading and its experiment on the same page",
+  );
   await page
-    .getByRole("navigation", { name: "فهرست درس‌ها" })
-    .getByRole("button", { name: /از مشاهده تا برنامه/ })
-    .click();
+    .getByLabel("یادداشت این درس", { exact: true })
+    .fill("ورودی و خروجی برابر؛ سطح ثابت می‌ماند.");
+  await click("خواندم؛ ادامهٔ مسیر");
+  await expect(page).toHaveURL(/\/chain$/);
+  await page.goBack();
+  await expect(page.locator(".course-lesson-heading h1")).toHaveText(
+    lessons[0].title,
+  );
+  await expect(page.getByLabel("یادداشت این درس", { exact: true })).toHaveValue(
+    "ورودی و خروجی برابر؛ سطح ثابت می‌ماند.",
+  );
+  await page.reload();
+  await expect(page.getByLabel("یادداشت این درس", { exact: true })).toHaveValue(
+    "ورودی و خروجی برابر؛ سطح ثابت می‌ماند.",
+  );
+  assert.equal(
+    await page.evaluate(() =>
+      JSON.parse(
+        localStorage.getItem("soovers-ics-foundations-v1"),
+      ).progress.completed.includes("process"),
+    ),
+    true,
+  );
+  pass(
+    "Read-and-continue, browser Back, deep links and workbook autosave preserve the learning context",
+  );
   await page
-    .getByRole("button", { name: "این درس را خواندم", exact: true })
+    .getByRole("button", { name: "واژه‌نامه کنار درس", exact: true })
     .click();
+  const dialog = page.getByRole("dialog", { name: "کتابخانه کنار درس" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator(".ics-glossary>div")).toHaveCount(102);
+  await page.getByLabel("جست‌وجوی واژه‌نامه").fill("Calibration");
+  await expect(dialog.locator(".ics-glossary>div")).toHaveCount(1);
+  await page.keyboard.press("Escape");
+  await expect(dialog).not.toBeVisible();
   await expect(
-    page.getByRole("button", { name: "مطالعه ثبت شد", exact: true }),
-  ).toBeDisabled();
+    page.getByRole("button", { name: "واژه‌نامه کنار درس", exact: true }),
+  ).toBeFocused();
+  await click("متن عمیق همین موضوع از کتاب دانشجو");
+  await dialog.locator(".ics-reading summary").first().click();
+  await expect(dialog.locator(".ics-book-text").first()).toBeVisible();
+  await page.keyboard.press("Escape");
+  pass(
+    "Contextual glossary and original reading return focus to the same lesson",
+  );
+  await open("chain");
+  await click("بازکردن اطلس کنار درس");
+  await expect(dialog.locator(".ics-device-list button")).toHaveCount(12);
+  await page.getByLabel("جست‌وجوی تجهیزات").fill("DVC6200");
+  await dialog.locator(".ics-device-list button").click();
+  await expect(dialog.locator(".ics-device-detail")).toContainText("پوزیشنر");
+  await page.keyboard.press("Escape");
+  pass("Equipment exploration stays in a dismissible companion panel");
+  const drawn = lessons.find((l) => l.chapter === 3);
+  await open(drawn.id);
+  await expect(page.locator(".course-case")).toBeVisible();
+  await page
+    .locator(".course-decision")
+    .first()
+    .getByRole("button")
+    .nth((drawn.practice.steps[0].answer + 1) % 3)
+    .click();
+  await expect(page.locator(".course-decision").first()).toContainText(
+    "دوباره بررسی",
+  );
+  await page
+    .locator(".course-decision")
+    .first()
+    .getByRole("button")
+    .nth(drawn.practice.steps[0].answer)
+    .click();
+  await expect(page.locator(".course-decision").first()).toContainText(
+    "استدلال درست",
+  );
+  await page.getByLabel("اندازهٔ متن").selectOption("21");
+  await page.screenshot({
+    path: path.join(out, "02-reading.png"),
+    fullPage: true,
+  });
+  await page.reload();
+  await expect(page.getByLabel("اندازهٔ متن")).toHaveValue("21");
+  pass(
+    "New chapters include explanatory cases and recoverable reasoning; reading size persists",
+  );
+  for (const l of lessons) {
+    await open(l.id);
+    await expect(page.locator("#lesson-text")).toContainText(
+      l.sections[0].text.slice(0, 30),
+    );
+    await expect(page.locator("#lesson-practice")).toBeVisible();
+  }
+  await open("teach-back");
+  await click("خواندم؛ پایان مسیر");
+  await expect(page.locator(".course-cover")).toBeVisible();
+  assert.equal(
+    await page.evaluate(() =>
+      JSON.parse(
+        localStorage.getItem("soovers-ics-foundations-v1"),
+      ).progress.completed.includes("teach-back"),
+    ),
+    true,
+  );
   assert.deepEqual(
     await page.evaluate(
       () =>
@@ -95,239 +206,181 @@ try {
     ),
     {},
   );
-  pass("Last lesson is accessible and completion works with no assessment");
-  await page
-    .getByRole("navigation", { name: "فهرست درس‌ها" })
-    .getByRole("button", { name: /معنای جریان/ })
-    .click();
-  await page.getByRole("button", { name: "۲٫۸ متر", exact: true }).click();
-  await expect(page.locator(".ics-answer")).toContainText("یک بار دیگر");
-  await page.getByRole("button", { name: "۲٫۵ متر", exact: true }).click();
-  await expect(page.locator(".ics-answer")).toContainText("درست است");
-  await page.locator(".ics-reading summary").first().click();
-  await expect(page.locator(".ics-reading details[open]")).toContainText(
-    "physical",
+  pass(
+    "All 42 lessons across 34 chapters open directly; final completion requires no assessment",
   );
-  pass("Optional knowledge check gives feedback and source reading opens");
-  await nav("مخزن و کنترل");
+  await open("scaling");
+  await page.locator(".course-quiz summary").click();
+  await page.getByRole("button", { name: "۲٫۸ متر", exact: true }).click();
+  await expect(page.locator(".course-quiz")).toContainText("یک بار دیگر");
+  await page.getByRole("button", { name: "۲٫۵ متر", exact: true }).click();
+  await expect(page.locator(".course-quiz")).toContainText("درست است");
+  await slider(/جریان ورودی/, 0);
+  await expect(page.getByTestId("scaling-result")).toContainText(
+    "خارج از بازه",
+  );
+  await slider(/حد بالای PLC/, 8);
+  await expect(page.getByTestId("mismatch-result")).toContainText("۲٫۰۰");
+  pass(
+    "Optional quizzes and inline signal experiment give independent feedback",
+  );
+  await open("truth");
   await page.getByLabel("سناریو", { exact: true }).selectOption("sensor");
-  await page
-    .getByRole("button", { name: "اجرای شبیه‌سازی", exact: true })
-    .click();
-  await expect(
-    page.locator(".ics-readouts").getByText("۱٬۲۰۰ s", { exact: true }),
-  ).toBeVisible({ timeout: 20000 });
-  await expect(page.locator(".ics-readouts")).toContainText("۳٫۸۰ m");
-  await expect(page.locator(".ics-readouts")).toContainText("۰ s");
-  let download = page.waitForEvent("download");
-  await page.getByRole("button", { name: /دریافت دادهٔ شبیه/ }).click();
-  let downloaded = await download;
-  await downloaded.saveAs(path.join(out, "tank.csv"));
+  await click("اجرای شبیه‌سازی");
+  await expect(page.locator(".ics-readouts")).toContainText("۳٫۸۰ m", {
+    timeout: 20000,
+  });
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: /CSV/ }).click();
+  const file = await download;
+  await file.saveAs(path.join(out, "tank.csv"));
   assert.equal(
     (await readFile(path.join(out, "tank.csv"), "utf8")).trim().split("\n")
       .length,
     1202,
   );
-  await page.screenshot({
-    path: path.join(out, "02-tank.png"),
-    fullPage: true,
-  });
   pass(
-    "Frozen sensor separates physical state and fresh wrong display; exports 1201 data rows",
+    "The inline tank model still distinguishes frozen measurement and exports the full run",
   );
-  await page.getByLabel("سناریو", { exact: true }).selectOption("hmi");
-  await page
-    .getByRole("button", { name: "اجرای شبیه‌سازی", exact: true })
-    .click();
-  await expect(
-    page.locator(".ics-readouts").getByText("۹۰۰ s", { exact: true }),
-  ).toBeVisible({ timeout: 20000 });
-  pass("Stale HMI preserves old samples while sample age grows");
-  await nav("سیگنال و رنج");
-  await setSlider(/جریان ورودی/, 14);
-  await expect(page.getByTestId("scaling-result")).toContainText("۲٫۵۰");
-  await setSlider(/جریان ورودی/, 0);
-  await expect(page.getByTestId("scaling-result")).toContainText(
-    "خارج از بازه",
+  const reportEvent = page.waitForEvent("download");
+  await click("دریافت گزارش یادگیری");
+  const reportFile = await reportEvent;
+  await reportFile.saveAs(path.join(out, "learning.json"));
+  const report = JSON.parse(
+    await readFile(path.join(out, "learning.json"), "utf8"),
   );
-  await expect(page.getByTestId("mismatch-result")).toContainText("۱٫۰۰");
-  await setSlider(/حد بالای PLC/, 8);
-  await expect(page.getByTestId("mismatch-result")).toContainText("۲٫۰۰");
-  await setSlider(/مقاومت کل مسیر/, 700);
-  await expect(page.getByTestId("loop-result")).toContainText("کافی نیست");
-  pass(
-    "Signal scaling, invalid input, range correction and insufficient loop budget respond correctly",
+  assert.equal(
+    report.workbook.process,
+    "ورودی و خروجی برابر؛ سطح ثابت می‌ماند.",
   );
-  await nav("میز شواهد");
-  await page
-    .getByRole("button", { name: "تفسیر و محدودیت شاهد" })
-    .first()
-    .click();
-  await expect(
-    page.getByText(
-      "توافق این دو مستقل نیست؛ هر دو یک تبدیل PLC را مصرف می‌کنند.",
-    ),
-  ).toBeVisible();
-  await page
-    .getByLabel("یادداشت پرونده")
-    .fill("مالک شواهد: مهندسی؛ زمان تغییر رنج هنوز نامعلوم است.");
-  await page
-    .getByRole("button", { name: "ذخیرهٔ یادداشت", exact: true })
-    .click();
-  await page.reload();
-  await nav("میز شواهد");
-  await expect(page.getByLabel("یادداشت پرونده")).toHaveValue(
-    "مالک شواهد: مهندسی؛ زمان تغییر رنج هنوز نامعلوم است.",
-  );
-  download = page.waitForEvent("download");
-  await page
-    .getByRole("button", { name: "گزارش یادگیری", exact: true })
-    .click();
-  downloaded = await download;
-  await downloaded.saveAs(path.join(out, "learning.json"));
-  const report = JSON.parse(await readFile(path.join(out, "learning.json")));
   assert.equal(report.results.scaling.correct, true);
-  assert.deepEqual(report.progress.completed, ["evidence"]);
   pass(
-    "Evidence notebook and optional answers persist; exported report matches actual progress",
-  );
-  await nav("اطلس تجهیزات");
-  await expect(page.locator(".ics-device-list button")).toHaveCount(12);
-  await page.getByLabel("جست‌وجوی تجهیزات").fill("DVC6200");
-  await expect(page.locator(".ics-device-list button")).toHaveCount(1);
-  await page.locator(".ics-device-list button").click();
-  await expect(page.locator(".ics-device-detail")).toContainText("پوزیشنر");
-  await page.screenshot({
-    path: path.join(out, "03-atlas.png"),
-    fullPage: true,
-  });
-  await nav("واژه‌نامه");
-  await expect(page.locator(".ics-glossary>div")).toHaveCount(102);
-  await page.getByLabel("جست‌وجوی واژه‌نامه").fill("Calibration");
-  await expect(page.locator(".ics-glossary>div")).toHaveCount(1);
-  pass(
-    "All twelve equipment profiles and 102 source glossary entries are searchable",
+    "Export includes actual reading progress, optional results and lesson-specific work",
   );
   for (const viewport of [
     { width: 390, height: 844 },
     { width: 844, height: 390 },
   ]) {
     await page.setViewportSize(viewport);
-    for (const tab of [
-      "آکادمی",
-      "درس‌ها",
-      "مخزن و کنترل",
-      "سیگنال و رنج",
-      "میز شواهد",
-      "اطلس تجهیزات",
-      "واژه‌نامه",
-      "مسیر دوره",
-      "منابع",
+    for (const id of [
+      "process",
+      "scaling",
+      drawn.id,
+      "capstone-process",
+      "teach-back",
     ]) {
-      await nav(tab);
-      assert.equal(
-        await page.evaluate(
-          () => document.documentElement.scrollWidth > innerWidth + 1,
-        ),
-        false,
-        `${tab} overflows ${viewport.width}`,
-      );
+      await open(id);
+      await overflow();
     }
-    await nav("آکادمی");
-    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+    await open(drawn.id);
     await page.screenshot({
-      path: path.join(out, `04-mobile-${viewport.width}.png`),
+      path: path.join(out, `03-mobile-${viewport.width}.png`),
       fullPage: true,
     });
+    if (viewport.width < 760) {
+      await click("فهرست فصل‌ها");
+      const menu = page.getByRole("dialog", { name: "فهرست فصل‌ها" });
+      await expect(menu).toBeVisible();
+      await menu.getByLabel("جست‌وجوی درس‌ها").fill("Modbus");
+      await menu.locator("details summary").first().click();
+      await expect(menu).not.toBeVisible();
+      await expect(page.locator(".course-lesson-heading h1")).toContainText(
+        /Modbus|مودباس/i,
+      );
+      await page.keyboard.press("Tab");
+      await overflow();
+    }
   }
-  pass("Every ICS view fits mobile portrait and landscape");
-  assert.deepEqual(apiRequests, []);
-  assert.deepEqual(errors, []);
   pass(
-    "Static demo makes no account API requests and has no missing assets/runtime errors",
+    "Reader, experiments, capstones and searchable chapter drawer fit portrait and landscape",
   );
-  const privatePage = await browser.newPage();
-  await privatePage.addInitScript(() => {
-    Storage.prototype.getItem = function () {
-      throw Error("blocked");
-    };
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto(demo + "/#ics/lesson/does-not-exist");
+  await expect(
+    page.getByRole("heading", { name: "این درس پیدا نشد" }),
+  ).toBeVisible();
+  await click("بازگشت به دوره");
+  await expect(page.locator(".course-cover")).toBeVisible();
+  assert.deepEqual(apiRequests, []);
+  pass(
+    "Unknown lesson links recover cleanly and static study makes no account API requests",
+  );
+  const blocked = await browser.newPage();
+  await blocked.addInitScript(() => {
     Storage.prototype.setItem = function () {
-      throw Error("blocked");
+      throw new Error("storage denied");
     };
   });
-  await privatePage.goto(demo);
+  await blocked.goto(demo + "/#ics/lesson/process");
+  await blocked
+    .getByLabel("یادداشت این درس", { exact: true })
+    .fill("یادداشت قابل دریافت");
   await expect(
-    privatePage.getByRole("heading", { name: "سیستم را بفهم. بعد تحلیل کن." }),
+    blocked.getByRole("button", { name: "تلاش دوباره برای ذخیره" }),
   ).toBeVisible();
-  await privatePage
-    .getByRole("button", { name: "شروع یادگیری", exact: true })
-    .click();
-  await expect(privatePage.locator(".ics-lesson")).toBeVisible();
-  await privatePage.close();
-  pass("Unavailable browser storage does not prevent learning");
-  await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.goto(product);
-  await page.getByLabel("نام شما", { exact: true }).fill("دانشجوی صنعتی");
-  await page
-    .getByLabel("ایمیل", { exact: true })
-    .fill("ics-browser@example.com");
-  await page
-    .getByLabel("گذرواژه", { exact: true })
-    .fill("industrial browser testing");
-  await page.getByRole("button", { name: "ساخت حساب و شروع یادگیری" }).click();
-  await page.getByRole("link", { name: "شروع آکادمی صنعتی" }).click();
-  await expect(
-    page.getByRole("heading", { name: "سیستم را بفهم. بعد تحلیل کن." }),
-  ).toBeVisible();
-  await nav("درس‌ها");
-  await page
-    .getByRole("button", { name: "این درس را خواندم", exact: true })
-    .click();
-  await expect(page.locator(".ics-sidebar-progress")).toContainText(
-    "در حساب شما ذخیره شد",
+  const blockedDownload = blocked.waitForEvent("download");
+  await blocked.getByRole("button", { name: "دریافت گزارش یادگیری" }).click();
+  await (await blockedDownload).saveAs(path.join(out, "blocked-storage.json"));
+  assert.equal(
+    JSON.parse(await readFile(path.join(out, "blocked-storage.json"), "utf8"))
+      .workbook.process,
+    "یادداشت قابل دریافت",
   );
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.route("**/api/ics/progress", (r) => r.abort());
-  await page.getByRole("button", { name: "درس بعد", exact: true }).click();
-  await expect(
-    page
-      .locator(".ics-mobile-progress")
-      .getByRole("button", { name: "تلاش دوباره برای ذخیره" }),
-  ).toBeVisible();
-  await page.unroute("**/api/ics/progress");
-  await page
-    .locator(".ics-mobile-progress")
-    .getByRole("button", { name: "تلاش دوباره برای ذخیره" })
-    .click();
-  await expect(page.locator(".ics-mobile-progress")).toContainText(
-    "در حساب شما ذخیره شد",
-  );
-  await page.reload();
-  await nav("درس‌ها");
-  await expect(page.locator(".ics-lesson>h2")).toHaveText("از حسگر تا عملگر");
+  await blocked.close();
   pass(
-    "Authenticated progress saves without F5 enrollment, retries on mobile and restores after reload",
+    "Unavailable storage preserves in-memory study and allows exporting unsaved work",
   );
-  await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.getByRole("link", { name: "حساب من", exact: true }).click();
+  const auth = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await auth.request.post(product + "/api/auth/register", {
+    headers: { Origin: product, "X-Soovers-Request": "1" },
+    data: {
+      name: "Industrial learner",
+      email: "reader@example.com",
+      password: "reader validation phrase!",
+    },
+  });
+  await auth.goto(product + "/#ics/lesson/drawings");
+  await expect(auth.locator(".course-lesson-heading")).toBeVisible();
+  await auth.route("**/api/ics/workbook", (r) => r.abort());
+  await auth
+    .getByLabel("یادداشت این درس", { exact: true })
+    .fill("ثبت رابطهٔ حلقه با فرایند");
   await expect(
-    page.getByRole("heading", { name: "دانشجوی صنعتی، آمادهٔ قدم بعدی؟" }),
+    auth.getByRole("button", { name: "تلاش دوباره برای ذخیره" }),
   ).toBeVisible();
-  await page
-    .getByRole("button", { name: "ثبت‌نام و شروع دوره", exact: true })
-    .click();
-  await expect(page.locator(".academy-chapters button")).toHaveCount(6);
-  pass("Existing F5 course remains available alongside the ICS academy");
+  await auth.unroute("**/api/ics/workbook");
+  await auth.getByRole("button", { name: "تلاش دوباره برای ذخیره" }).click();
+  await expect(auth.locator(".course-save-state")).toContainText(
+    "در حساب شما ذخیره شد",
+  );
+  await auth.reload();
+  await expect(auth.getByLabel("یادداشت این درس", { exact: true })).toHaveValue(
+    "ثبت رابطهٔ حلقه با فرایند",
+  );
+  assert.equal(
+    (await (await auth.request.get(product + "/api/course")).json()).course,
+    null,
+  );
+  await auth.close();
+  pass(
+    "Authenticated deep links work without F5 enrollment; failed note saves retry on mobile and survive reload",
+  );
   assert.deepEqual(errors, []);
+  pass("No missing assets or browser runtime errors");
   await writeFile(
     path.join(out, "results.json"),
-    JSON.stringify({ results, errors }, null, 2),
+    JSON.stringify(
+      { browser: await browser.version(), results, errors },
+      null,
+      2,
+    ),
   );
-  console.log(`${results.length} ICS browser scenarios passed.`);
+  console.log(results.length + " ICS reader scenarios passed.");
 } catch (e) {
-  await page
-    ?.screenshot({ path: path.join(out, "failure.png"), fullPage: true })
-    .catch(() => {});
+  if (page)
+    await page
+      .screenshot({ path: path.join(out, "failure.png"), fullPage: true })
+      .catch(() => {});
   throw e;
 } finally {
   await browser?.close();

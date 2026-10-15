@@ -127,7 +127,7 @@ export default function ProductApp() {
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, [route]);
-  const preview = route === "#tower" || route === "#demo" || route === "#ics-demo";
+  const preview = route === "#tower" || route === "#demo" || route.startsWith("#ics-demo");
   useEffect(() => {
     if (!preview) void refresh();
   }, [preview, refresh]);
@@ -280,17 +280,18 @@ export default function ProductApp() {
       setBusy(false);
     }
   };
-  if (route === "#tower" || route === "#demo" || route === "#ics-demo")
+  if (route === "#tower" || route === "#demo" || route.startsWith("#ics-demo"))
     return (
       <ProductBoundary>
         <div className="preview-bar">
           <span>پیش‌نمایش آموزشی · پیشرفت این بخش به حساب شما متصل نیست</span>
-          <a href="#home">
-            بازگشت به آکادمی <ArrowLeft size={14} />
+          <a href={user?"#ics":"#ics-demo"}>
+            آموزش معمولی بدون عینک <ArrowLeft size={14} />
           </a>
+          <a href="#home">{user ? "حساب من" : "ثبت‌نام و ورود"}</a>
         </div>
         <Suspense fallback={<Loading />}>
-          {route === "#tower" ? <Tower /> : route === "#ics-demo" ? <Industrial /> : <Academy />}
+          {route === "#tower" ? <Tower /> : route.startsWith("#ics-demo") ? <Industrial /> : <Academy />}
         </Suspense>
       </ProductBoundary>
     );
@@ -316,7 +317,7 @@ export default function ProductApp() {
         }}
       />
     );
-  if (route === "#ics") return <ProductBoundary><Suspense fallback={<Loading />}><Industrial key={user.id} account={user} /></Suspense></ProductBoundary>;
+  if (route === "#ics" || route.startsWith("#ics/")) return <ProductBoundary><Suspense fallback={<Loading />}><Industrial key={user.id} account={user} /></Suspense></ProductBoundary>;
   if (route === "#academy" && course)
     return (
       <ProductBoundary>
@@ -390,7 +391,7 @@ export default function ProductApp() {
                 پیشرفت متصل به حساب
               </span>
             </div>
-            <section className="ics-course-feature"><div><span className="product-kicker">INDUSTRIAL SYSTEMS / NEW ACADEMY</span><h2>آکادمی سیستم‌های کنترل صنعتی</h2><p>از مخزن و حلقهٔ کنترل تا تجهیزات واقعی و تحلیل شواهد. ۱۰ درس فارسی، متن عمیق کتاب، ۱۲ تجهیز و سه میز تمرین.</p><a className="product-primary" href="#ics">شروع آکادمی صنعتی <ArrowLeft size={18}/></a><small>تمام درس‌ها آزاد؛ تعیین سطح و ارزیابی اختیاری</small></div><div className="ics-course-symbol" aria-hidden="true">ICS<span>PROCESS → SIGNAL → CONTROL</span></div></section>
+            <section className="ics-course-feature"><div><span className="product-kicker">INDUSTRIAL SYSTEMS / NEW ACADEMY</span><h2>آکادمی سیستم‌های کنترل صنعتی</h2><p>از مخزن و حلقهٔ کنترل تا تجهیزات واقعی و تحلیل شواهد. مسیر پیوستهٔ فصل‌ها، تمرین در کنار درس، دفتر یادگیری و پروژه‌های پایانی.</p><a className="product-primary" href="#ics">شروع آکادمی صنعتی <ArrowLeft size={18}/></a><small>تمام درس‌ها آزاد؛ تعیین سطح و ارزیابی اختیاری</small></div><div className="ics-course-symbol" aria-hidden="true">ICS<span>PROCESS → SIGNAL → CONTROL</span></div></section>
             <section className="enrolled-course">
               <div className="course-art" aria-hidden="true">
                 <span>f5</span>

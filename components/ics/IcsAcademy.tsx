@@ -1,37 +1,25 @@
 "use client";
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import {
-  Activity,
   ArrowLeft,
+  ArrowRight,
   BookOpen,
   Check,
   ChevronLeft,
   Download,
-  Factory,
-  FlaskConical,
-  GraduationCap,
   Library,
-  Map,
+  Menu,
   Search,
-  ShieldCheck,
+  X,
 } from "lucide-react";
 import {
   lessons,
   contentVersion,
-  roadmap,
   sharedConversation,
+  type Lesson,
 } from "@/lib/ics/content";
-import { devices } from "@/lib/ics/devices";
-import book from "@/lib/ics/book.json";
-import {
-  ICS_STORAGE_KEY,
-  gradeAnswer,
-  initialProgress,
-  parseProgress,
-  type LearningProgress,
-  type QuizResults,
-} from "@/lib/ics/model";
-import { api, type User } from "@/lib/product/api";
+import { chapters, phases, routeFor } from "@/lib/ics/course";
+import type { User } from "@/lib/product/api";
 import {
   TankLab,
   SignalLab,
@@ -39,253 +27,99 @@ import {
   PlantDiagram,
   downloadData,
 } from "./IcsLabs";
+import { Atlas, Glossary, BookReading, reading } from "./ReferencePanels";
+import { ChapterCase } from "./ChapterCase";
+import { useIcsLearning } from "./useIcsLearning";
 import "./ics.css";
-type View =
-  | "home"
-  | "lessons"
-  | "tank"
-  | "signal"
-  | "evidence"
-  | "atlas"
-  | "glossary"
-  | "roadmap"
-  | "sources";
-type RecordData = { progress: LearningProgress; results: QuizResults };
+import "./reader.css";
 const fa = (n: number) => n.toLocaleString("fa-IR");
-const tabs: { id: View; label: string; icon: typeof BookOpen }[] = [
-  { id: "home", label: "آکادمی", icon: Factory },
-  { id: "lessons", label: "درس‌ها", icon: BookOpen },
-  { id: "tank", label: "مخزن و کنترل", icon: Activity },
-  { id: "signal", label: "سیگنال و رنج", icon: FlaskConical },
-  { id: "evidence", label: "میز شواهد", icon: ShieldCheck },
-  { id: "atlas", label: "اطلس تجهیزات", icon: Library },
-  { id: "glossary", label: "واژه‌نامه", icon: Search },
-  { id: "roadmap", label: "مسیر دوره", icon: Map },
-  { id: "sources", label: "منابع", icon: GraduationCap },
-];
-const reading: Record<string, string[]> = {
-  process: ["1.1", "1.2"],
-  chain: ["1.3", "1.6", "1.9", "1.11", "1.12"],
-  scaling: ["1.4", "1.5", "1.15"],
-  feedback: ["1.7", "1.8", "1.16"],
-  truth: ["1.10", "1.13", "1.14"],
-  electricity: ["2.1", "2.2", "2.3", "2.4", "2.14"],
-  io: ["2.5", "2.6", "2.11"],
-  mismatch: ["2.7", "2.8", "2.9", "2.10", "2.12", "2.15"],
-  asset: ["2.16", "E13", "E14"],
-  evidence: ["1.17", "1.18", "1.19", "2.13", "2.17", "2.18"],
-};
-function cleanResults(value: unknown): QuizResults {
-  const out: QuizResults = {};
-  if (value && typeof value === "object")
-    for (const [id, v] of Object.entries(value)) {
-      try {
-        const answer = gradeAnswer(id, (v as { choice: number }).choice);
-        out[id] = { choice: answer.choice, correct: answer.correct };
-      } catch {}
-    }
-  return out;
-}
-function BookReading({ ids }: { ids: string[] }) {
-  return (
-    <div className="ics-reading">
-      <h3>مطالعهٔ عمیق از کتاب دانشجو</h3>
-      <p>
-        متن انگلیسی سند ارسالی، با شمارهٔ بخش اصلی. تصاویر و فایل‌های آزمایشگاهِ
-        ارجاع‌شده در متن، همراه این خوانش نیستند؛ تمرین‌های تعاملی این صفحه
-        پیاده‌سازی مستقل آموزشی‌اند.
-      </p>
-      {ids.map((id) => {
-        const section = book.sections[id as keyof typeof book.sections];
-        return section ? (
-          <details key={id}>
-            <summary dir="ltr">{section.title}</summary>
-            <div lang="en" dir="ltr" className="ics-book-text">
-              {section.blocks.map((block, i) =>
-                block.type === "table" && "rows" in block ? (
-                  <div className="ics-table-scroll" key={i}>
-                    <table>
-                      <tbody>
-                        {block.rows?.map((row, j) => (
-                          <tr key={j}>
-                            {row.map((cell, k) =>
-                              j === 0 ? (
-                                <th scope="col" key={k}>
-                                  {cell}
-                                </th>
-                              ) : (
-                                <td key={k}>{cell}</td>
-                              ),
-                            )}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : "text" in block ? (
-                  <p key={i}>{block.text}</p>
-                ) : null,
-              )}
-            </div>
-          </details>
-        ) : null;
-      })}
-    </div>
-  );
-}
+type Reference = "book" | "atlas" | "glossary" | "sources";
 export default function IcsAcademy({ account }: { account?: User }) {
-  const [view, setView] = useState<View>("home"),
-    [progress, setProgress] = useState<LearningProgress>(initialProgress),
-    [results, setResults] = useState<QuizResults>({}),
-    [ready, setReady] = useState(false),
-    [loadError, setLoadError] = useState(""),
-    [sync, setSync] = useState(""),
-    [notes, setNotes] = useState(""),
-    [quizBusy, setQuizBusy] = useState(false),
+  const learning = useIcsLearning(account),
+    { progress, results, workbook, ready } = learning;
+  const [route, setRoute] = useState(() => routeFor(location.hash)),
+    [reference, setReference] = useState<Reference>("glossary"),
+    [fontSize, setFontSize] = useState(18),
+    [reportError, setReportError] = useState(""),
     [quizError, setQuizError] = useState(""),
-    [reload, setReload] = useState(0);
-  const latest = useRef(progress),
-    notesRef = useRef(notes),
-    pending = useRef<LearningProgress | null>(null),
-    queue = useRef<Promise<void>>(Promise.resolve()),
-    mounted = useRef(true),
-    title = useRef<HTMLHeadingElement>(null),
-    content = useRef<HTMLDivElement>(null),
-    resultsRef = useRef(results);
-  latest.current = progress;
-  notesRef.current = notes;
-  resultsRef.current = results;
+    [quizBusy, setQuizBusy] = useState(false),
+    [pendingExit, setPendingExit] = useState("");
+  const outline = useRef<HTMLDialogElement>(null),
+    library = useRef<HTMLDialogElement>(null),
+    heading = useRef<HTMLHeadingElement>(null),
+    savedId = useRef("");
+  const base = location.hash.startsWith("#ics-demo") ? "#ics-demo" : "#ics";
+  const lesson = lessons.find((l) => l.id === (route.id || progress.lesson)),
+    validLesson = lesson || lessons[0],
+    index = lessons.indexOf(validLesson),
+    completed = progress.completed.length;
   useEffect(() => {
-    mounted.current = true;
-    let active = true;
-    setReady(false);
-    setLoadError("");
-    (async () => {
-      try {
-        let data: RecordData;
-        if (account) {
-          data = await api<RecordData>("/ics");
-        } else {
-          let raw = "";
-          try {
-            raw = localStorage.getItem(ICS_STORAGE_KEY) || "";
-          } catch {
-            if (active)
-              setSync(
-                "ذخیرهٔ مرورگر در دسترس نیست؛ دریافت گزارش همچنان ممکن است.",
-              );
-          }
-          try {
-            data = raw
-              ? JSON.parse(raw)
-              : { progress: initialProgress(), results: {} };
-          } catch {
-            data = { progress: initialProgress(), results: {} };
-          }
-        }
-        if (active) {
-          const p = parseProgress(data.progress);
-          setProgress(p);
-          setNotes(p.notes);
-          setResults(cleanResults(data.results));
-          setReady(true);
-        }
-      } catch (e) {
-        if (active)
-          setLoadError(
-            e instanceof Error ? e.message : "بارگذاری پیشرفت انجام نشد.",
-          );
-      }
-    })();
-    return () => {
-      active = false;
-      mounted.current = false;
+    const sync = () => {
+      setRoute(routeFor(location.hash));
+      setQuizError("");
+      outline.current?.close();
+      library.current?.close();
     };
-  }, [account?.id, reload]);
-  useEffect(() => {
-    const warn = (event: BeforeUnloadEvent) => {
-      if (pending.current || notesRef.current !== latest.current.notes) {
-        event.preventDefault();
-        event.returnValue = "";
-      }
-    };
-    window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
+    window.addEventListener("hashchange", sync);
+    return () => window.removeEventListener("hashchange", sync);
   }, []);
-  function persist(next: LearningProgress) {
-    pending.current = next;
-    setSync("در حال ذخیره…");
-    const task = queue.current
-      .catch(() => {})
-      .then(async () => {
-        try {
-          if (account)
-            await api("/ics/progress", "PATCH", {
-              ...next,
-              expectedUserId: account.id,
-            });
-          else
-            localStorage.setItem(
-              ICS_STORAGE_KEY,
-              JSON.stringify({ progress: next, results: resultsRef.current }),
-            );
-          if (pending.current === next) {
-            pending.current = null;
-            if (mounted.current)
-              setSync(
-                account ? "در حساب شما ذخیره شد" : "در این مرورگر ذخیره شد",
-              );
-          }
-        } catch (e) {
-          if (mounted.current)
-            setSync(
-              e instanceof Error
-                ? e.message
-                : "ذخیره انجام نشد؛ دوباره تلاش کن.",
-            );
-          throw e;
-        }
-      });
-    queue.current = task;
-    return task;
-  }
-  function change(next: LearningProgress) {
-    latest.current = next;
-    setProgress(next);
-    void persist(next).catch(() => {});
-  }
-  function go(next: View) {
-    setView(next);
-    setQuizError("");
-    requestAnimationFrame(() => {
-      content.current?.scrollTo(0, 0);
+  useEffect(() => {
+    if (!ready) return;
+    if (route.view === "lesson" && lesson && savedId.current !== lesson.id) {
+      savedId.current = lesson.id;
+      if (progress.lesson !== lesson.id)
+        learning.change({ ...progress, lesson: lesson.id });
+    }
+    window.scrollTo(0, 0);
+    heading.current?.focus({ preventScroll: true });
+  }, [ready, route.view, route.id]);
+  useEffect(() => {
+    try {
+      const n = Number(localStorage.getItem("soovers-reader-font"));
+      if ([18, 19, 21].includes(n)) setFontSize(n);
+    } catch {}
+  }, []);
+  function navigate(id?: string) {
+    outline.current?.close();
+    library.current?.close();
+    const hash = id ? `${base}/lesson/${id}` : base;
+    if (location.hash === hash) {
       window.scrollTo(0, 0);
-      title.current?.focus({ preventScroll: true });
-    });
+      heading.current?.focus();
+    } else location.hash = hash;
   }
-  function openLesson(id: string) {
-    change({ ...latest.current, lesson: id });
-    go("lessons");
+  function openReference(kind: Reference) {
+    setReference(kind);
+    library.current?.showModal();
+  }
+  function next() {
+    const nextLesson = lessons[index + 1];
+    learning.change({
+      ...progress,
+      lesson: nextLesson?.id || validLesson.id,
+      completed: [...new Set([...progress.completed, validLesson.id])],
+    });
+    if (nextLesson) navigate(nextLesson.id);
+    else navigate();
+  }
+  function jump(id: string) {
+    const target = document.getElementById(id);
+    target?.scrollIntoView({
+      behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "instant"
+        : "smooth",
+      block: "start",
+    });
+    target?.focus({ preventScroll: true });
   }
   async function leave(event: MouseEvent<HTMLAnchorElement>) {
     event.preventDefault();
-    const destination = event.currentTarget.hash;
-    if (notesRef.current !== latest.current.notes) {
-      const next = { ...latest.current, notes: notesRef.current };
-      setProgress(next);
-      latest.current = next;
-      try {
-        await persist(next);
-      } catch {
-        return;
-      }
-    }
+    const hash = event.currentTarget.hash;
     try {
-      await queue.current;
-      if (pending.current) await persist(pending.current);
-      location.hash = destination;
+      await learning.flush();
+      location.hash = hash;
     } catch {
-      setSync("خروج انجام نشد؛ ابتدا ذخیره را دوباره امتحان کن.");
+      setPendingExit(hash);
     }
   }
   async function answer(choice: number) {
@@ -293,662 +127,733 @@ export default function IcsAcademy({ account }: { account?: User }) {
     setQuizBusy(true);
     setQuizError("");
     try {
-      const id = progress.lesson;
-      const result = account
-        ? await api<{ choice: number; correct: boolean; explanation: string }>(
-            "/ics/assessment",
-            "POST",
-            { lesson: id, choice, expectedUserId: account.id },
-          )
-        : gradeAnswer(id, choice);
-      const next = {
-        ...resultsRef.current,
-        [id]: { choice: result.choice, correct: result.correct },
-      };
-      resultsRef.current = next;
-      setResults(next);
-      if (!account) {
-        try {
-          localStorage.setItem(
-            ICS_STORAGE_KEY,
-            JSON.stringify({ progress: latest.current, results: next }),
-          );
-        } catch {
-          setSync("نتیجه در حافظه است؛ ذخیرهٔ مرورگر در دسترس نیست.");
-        }
-      }
+      await learning.answer(validLesson.id, choice);
     } catch (e) {
       setQuizError(e instanceof Error ? e.message : "پاسخ ثبت نشد.");
     } finally {
       setQuizBusy(false);
     }
   }
-  async function report() {
+  async function exportReport() {
+    setReportError("");
     try {
-      await queue.current;
-      if (pending.current) await persist(pending.current);
-      const data = account
-        ? await api("/ics/report")
-        : {
-            course: "ics-foundations",
-            contentVersion,
-            simulation: true,
-            progress: latest.current,
-            results: resultsRef.current,
-            assessmentOptional: true,
-          };
-      downloadData("SooVers-ICS-learning.json", data);
+      downloadData("SooVers-ICS-learning.json", await learning.report());
     } catch (e) {
-      setSync(e instanceof Error ? e.message : "دریافت گزارش انجام نشد.");
+      setReportError(
+        e instanceof Error ? e.message : "گزارش دریافت نشد؛ دوباره تلاش کن.",
+      );
     }
   }
-  const lesson = lessons.find((l) => l.id === progress.lesson) ?? lessons[0],
-    index = lessons.indexOf(lesson),
-    completed = progress.completed.length;
-  if (loadError)
+  if (learning.error)
     return (
-      <main className="ics-app ics-loading" dir="rtl">
-        <h1>پیشرفت دوره دریافت نشد</h1>
-        <p role="alert">{loadError}</p>
-        <button onClick={() => setReload((n) => n + 1)}>تلاش دوباره</button>
+      <main className="ics-app course-app course-loading" dir="rtl">
+        <h1>پیشرفت دریافت نشد</h1>
+        <p role="alert">{learning.error}</p>
+        <button onClick={learning.reload}>تلاش دوباره</button>
         <a href="#home">بازگشت به حساب</a>
       </main>
     );
   if (!ready)
     return (
-      <main className="ics-app ics-loading" role="status" dir="rtl">
-        در حال آماده‌سازی آکادمی کنترل صنعتی…
+      <main
+        className="ics-app course-app course-loading"
+        dir="rtl"
+        role="status"
+      >
+        در حال آماده‌سازی دوره…
       </main>
     );
+  const commonOutline = (
+    <CourseOutline
+      selected={route.view === "lesson" ? validLesson.id : undefined}
+      completed={progress.completed}
+      onOpen={navigate}
+    />
+  );
   return (
-    <main className="ics-app" dir="rtl">
+    <main
+      className="ics-app course-app"
+      dir="rtl"
+      style={{ "--reading-size": fontSize + "px" } as React.CSSProperties}
+    >
       <a
         className="ics-skip"
-        href="#ics-content"
+        href="#course-reading"
         onClick={(e) => {
           e.preventDefault();
-          title.current?.focus();
+          heading.current?.focus();
         }}
       >
-        رفتن به محتوا
+        رفتن به متن درس
       </a>
-      <header className="ics-header">
+      <header className="course-header">
         <a
-          href={account ? "#home" : "#ics"}
-          onClick={
-            account
-              ? leave
-              : (e) => {
-                  e.preventDefault();
-                  go("home");
-                }
-          }
-          className="ics-brand"
+          className="course-brand"
+          href={base}
+          onClick={(e) => {
+            e.preventDefault();
+            navigate();
+          }}
         >
           <span>S</span>
           <b dir="ltr">
-            SooVers<small>INDUSTRIAL SYSTEMS ACADEMY</small>
+            SooVers<small>آکادمی سیستم‌های کنترل صنعتی</small>
           </b>
         </a>
-        <div className="ics-header-links">
-          <span className="ics-mode">
-            {account ? account.name : "یادگیری آزاد · بدون ثبت‌نام"}
-          </span>
-          <a href={account ? "#academy" : "#demo"} onClick={leave}>
-            آکادمی F5
+        <nav aria-label="ناوبری اصلی">
+          <button onClick={() => navigate()}>دورهٔ صنعتی</button>
+          <button onClick={() => openReference("glossary")}>
+            <Library size={16} />
+            کتابخانه
+          </button>
+          <a href={account ? "#home" : "#demo"} onClick={leave}>
+            {account ? "حساب من" : "دورهٔ F5"}
           </a>
-          <a href={account ? "#home" : "#tower"} onClick={leave}>
-            {account ? "حساب من" : "پردیس سه‌بعدی"}
+          <a className="course-immersive" href="#tower" onClick={leave}>
+            پردیس سه‌بعدی
             <ChevronLeft size={14} />
           </a>
-        </div>
+        </nav>
       </header>
-      <div className="ics-shell">
-        <aside className="ics-sidebar">
-          <span className="ics-eyebrow">LEARNING WORKSPACE / 01</span>
-          <nav aria-label="بخش‌های آکادمی صنعتی">
-            {tabs.map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                aria-label={label}
-                aria-current={view === id ? "page" : undefined}
-                onClick={() => go(id)}
-              >
-                <Icon size={18} />
-                {label}
-                {id === "atlas" && <small>۱۲</small>}
-              </button>
-            ))}
-          </nav>
-          <div className="ics-sidebar-progress">
-            <span>
-              پیشرفت مطالعه{" "}
-              <b dir="ltr">
-                {fa(completed)} / {fa(lessons.length)}
-              </b>
-            </span>
-            <progress max={lessons.length} value={completed} />
-            <small>خوداظهاری مطالعه؛ مستقل از آزمون</small>
-            <p role="status">
-              {sync ||
-                (account ? "پیشرفت متصل به حساب" : "پیشرفت در همین مرورگر")}
-            </p>
-            {pending.current && (
-              <button
-                onClick={() => void persist(pending.current!).catch(() => {})}
-              >
-                تلاش دوباره برای ذخیره
-              </button>
-            )}
-            <button onClick={() => void report()}>
-              <Download size={15} />
-              گزارش یادگیری
-            </button>
+      <div className="course-mobile-bar">
+        <button onClick={() => outline.current?.showModal()}>
+          <Menu size={18} />
+          فهرست فصل‌ها
+        </button>
+        <span>
+          {fa(completed)} از {fa(lessons.length)} درس
+        </span>
+      </div>
+      <div className="course-layout">
+        <aside className="course-sidebar">
+          <div className="course-outline-heading">
+            <BookOpen size={18} />
+            <strong>مسیر یادگیری شما</strong>
           </div>
-        </aside>
-        <div className="ics-content" id="ics-content" ref={content}>
-          <div className="ics-mobile-progress">
-            <span role="status">
-              {sync || `مطالعه: ${fa(completed)} از ${fa(lessons.length)}`}
+          <div className="course-progress">
+            <span>
+              {fa(completed)} از {fa(lessons.length)} درس خوانده‌شده
             </span>
-            {pending.current && (
+            <progress value={completed} max={lessons.length} />
+            <small>خواندن درس‌ها مستقل از نمره است</small>
+          </div>
+          {commonOutline}
+        </aside>
+        <div className="course-main">
+          <div className="course-save-state">
+            <span role="status">
+              {learning.sync ||
+                (account
+                  ? "پیشرفت متصل به حساب شما"
+                  : "ذخیرهٔ پیشرفت در همین مرورگر")}
+            </span>
+            {learning.failed && (
+              <button onClick={learning.retry}>تلاش دوباره برای ذخیره</button>
+            )}
+            {pendingExit && (
               <button
-                onClick={() => void persist(pending.current!).catch(() => {})}
+                onClick={() => {
+                  location.hash = pendingExit;
+                }}
               >
-                تلاش دوباره برای ذخیره
+                خروج بدون ذخیره
               </button>
             )}
             <button
-              onClick={() => void report()}
-              aria-label="گزارش یادگیری موبایل"
+              onClick={() => void exportReport()}
+              aria-label="دریافت گزارش یادگیری"
             >
-              <Download size={16} />
+              <Download size={15} />
             </button>
           </div>
-          <div className="ics-page-heading">
-            <span className="ics-eyebrow">
-              SOOVERS / ICS & OT / FOUNDATIONS
-            </span>
-            <h1 ref={title} tabIndex={-1}>
-              {view === "home"
-                ? "سیستم را بفهم. بعد تحلیل کن."
-                : tabs.find((t) => t.id === view)?.label}
-            </h1>
-          </div>
-          {view === "home" && (
+          {reportError && <p role="alert">{reportError}</p>}
+          {route.view === "home" ? (
             <>
-              <section className="ics-hero">
+              <section className="course-cover">
                 <div>
-                  <span className="ics-tag">مسیر جدید / کنترل صنعتی</span>
-                  <h2>
-                    از یک قطره آب
+                  <span className="course-kicker">
+                    از اولین مفهوم تا پروژهٔ پایانی
+                  </span>
+                  <h1 ref={heading} tabIndex={-1}>
+                    کنترل صنعتی را
                     <br />
-                    تا یک تصمیم مهندسی.
-                  </h2>
+                    قدم‌به‌قدم یاد بگیر.
+                  </h1>
                   <p>
-                    مخزن، حسگر، PLC و نمایشگر را به هم وصل کن. رفتار فرایند را
-                    ببین، سیگنال را تفسیر کن و از شواهد نتیجه بگیر.
+                    یک مسیر روشن برای فهم فرایند، شناخت تجهیزات و دفاع از
+                    سیستم‌های صنعتی. بخوان، همان‌جا تمرین کن و با یک قدم مشخص
+                    ادامه بده.
                   </p>
-                  <div className="ics-actions">
-                    <button
-                      className="ics-primary"
-                      onClick={() => openLesson(progress.lesson)}
-                    >
-                      {completed ? "ادامهٔ یادگیری" : "شروع یادگیری"}
-                      <ArrowLeft size={17} />
-                    </button>
-                    <button onClick={() => go("tank")}>
-                      ورود مستقیم به آزمایشگاه
-                    </button>
-                  </div>
+                  <button
+                    className="ics-primary course-start"
+                    onClick={() => navigate(progress.lesson)}
+                  >
+                    {completed || progress.lesson !== lessons[0].id
+                      ? "ادامهٔ یادگیری"
+                      : "شروع یادگیری"}
+                    <ArrowLeft size={18} />
+                  </button>
                   <small>
-                    بدون پیش‌نیاز اجباری یا تعیین سطح. هر درس و تمرین را آزادانه
-                    باز کن.
+                    {completed || progress.lesson !== lessons[0].id
+                      ? `جایی که بودی: ${lessons.find((l) => l.id === progress.lesson)?.title}`
+                      : "بدون نیاز به عینک، تعیین سطح یا آزمون اجباری"}
                   </small>
                 </div>
-                <div className="ics-hero-visual">
-                  <div className="ics-visual-label">
-                    <span>PROCESS TRAINER / TK-101</span>
-                    <i>● LOCAL SIMULATION</i>
-                  </div>
+                <div className="course-cover-diagram">
+                  <span>فرایندی که با آن یاد می‌گیری</span>
                   <PlantDiagram />
-                  <div className="ics-visual-legend">
-                    <span>فرایند</span>
-                    <span>سیگنال</span>
-                    <span>کنترل</span>
-                    <span>شواهد</span>
-                  </div>
+                  <p>مخزن TK-101 · حسگر، کنترلر و پمپ</p>
                 </div>
               </section>
-              <div className="ics-stats">
-                {[
-                  ["۱۰", "درس فارسی"],
-                  ["۰۳", "میز تمرین تعاملی"],
-                  ["۱۲", "پروفایل تجهیز"],
-                  ["۱۰۲", "اصطلاح دوزبانه"],
-                ].map(([value, label]) => (
-                  <div key={label}>
-                    <b>{value}</b>
-                    <span>{label}</span>
-                  </div>
-                ))}
+              <div className="course-facts">
+                <span>
+                  <b>{fa(chapters.length)}</b> فصل آموزشی
+                </span>
+                <span>
+                  <b>{fa(lessons.length)}</b> درس پیوسته
+                </span>
+                <span>
+                  <b>۲</b> پروژهٔ پایانی
+                </span>
+                <span>
+                  <b>۱۰۲</b> اصطلاح مرجع
+                </span>
               </div>
-              <div className="ics-section-head">
-                <div>
-                  <h2>پایه‌های یک تحلیل قابل اعتماد</h2>
-                  <p>
-                    بر پایهٔ فصل‌های ۱ و ۲ کتاب دانشجو، نسخهٔ دوم؛ همراه با
-                    خوانش عمیق متن اصلی.
-                  </p>
-                </div>
-                <button onClick={() => go("roadmap")}>
-                  دیدن مسیر کامل
+              <section className="course-home-path">
+                <h2>در این مسیر چه می‌سازی؟</h2>
+                <p>
+                  هر بخش روی بخش قبلی بنا می‌شود. هر زمان خواستی می‌توانی از
+                  فهرست، مستقیماً سراغ فصل موردنظرت بروی.
+                </p>
+                {phases.map((phase, i) => {
+                  const start = lessons.find(
+                    (l) => l.chapter === phase.range[0],
+                  );
+                  if (!start) return null;
+                  return (
+                    <button
+                      key={phase.title}
+                      onClick={() => navigate(start.id)}
+                    >
+                      <span>{fa(i + 1)}</span>
+                      <div>
+                        <small>
+                          فصل‌های {fa(phase.range[0])} تا {fa(phase.range[1])}
+                        </small>
+                        <h3>{phase.title}</h3>
+                        <p>{phase.description}</p>
+                      </div>
+                      <ArrowLeft size={18} />
+                    </button>
+                  );
+                })}
+              </section>
+              <section className="course-about">
+                <h2>روش مطالعهٔ این دوره</h2>
+                <p>
+                  هر درس یک سؤال روشن، توضیح، مثال حل‌شده، تمرین و جمع‌بندی
+                  دارد. واژه‌نامه و متن کتاب را بدون ترک درس باز کن. یادداشتت
+                  کنار همان درس ذخیره می‌شود؛ برای ادامه لازم نیست در آزمون شرکت
+                  کنی.
+                </p>
+                <p>
+                  این نسخه، راهنمای مطالعه و تمرین برای سرفصل‌های دوره است. متن
+                  اصلی کتاب دانشجو برای فصل‌های ۱ و ۲ در دسترس است؛ فصل‌های بعدی
+                  محتوای تألیفی آکادمی‌اند. برآورد ۸۱۶ ساعتِ طرح مرجع، مدت این
+                  درس‌های وب نیست.
+                </p>
+                <button onClick={() => openReference("sources")}>
+                  دربارهٔ منابع دوره
                   <ArrowLeft size={15} />
                 </button>
-              </div>
-              <div className="ics-chapter-cards">
-                {[1, 2].map((ch) => (
-                  <article className="ics-panel" key={ch}>
-                    <span className="ics-eyebrow">CHAPTER / 0{ch}</span>
-                    <h3>
-                      {ch === 1
-                        ? "مخزن، پمپ و حلقهٔ کنترل"
-                        : "برق، سیگنال و کیفیت اندازه‌گیری"}
-                    </h3>
-                    <p>
-                      {ch === 1
-                        ? "موازنهٔ حجم، ۴–۲۰ میلی‌آمپر، بازخورد و تفاوت فرایند با نمایش."
-                        : "بودجهٔ حلقه، I/O، رنج ناسازگار، شناخت دارایی و برنامهٔ شواهد."}
-                    </p>
-                    {lessons
-                      .filter((l) => l.chapter === ch)
-                      .map((l) => (
-                        <button
-                          className="ics-lesson-link"
-                          key={l.id}
-                          onClick={() => openLesson(l.id)}
-                        >
-                          <span>
-                            {progress.completed.includes(l.id) ? (
-                              <Check size={15} />
-                            ) : (
-                              <BookOpen size={15} />
-                            )}
-                          </span>
-                          {l.title}
-                          <small>{fa(l.minutes)} دقیقه</small>
-                        </button>
-                      ))}
-                  </article>
-                ))}
-              </div>
-              <div className="ics-callout">
-                <strong>ارزیابی برای یادگیری است.</strong>
-                <p>
-                  مطالعه و آزمایشگاه‌ها به نمره وابسته نیستند. زمان‌ها برآورد
-                  مطالعهٔ راهنمای فارسی‌اند؛ متن عمیق و تمرین زمان بیشتری
-                  می‌خواهند.
-                </p>
-              </div>
+              </section>
             </>
-          )}
-          {view === "lessons" && (
-            <div className="ics-lesson-layout">
-              <nav className="ics-lesson-nav" aria-label="فهرست درس‌ها">
-                {lessons.map((l, i) => (
-                  <button
-                    key={l.id}
-                    aria-current={l.id === lesson.id ? "step" : undefined}
-                    onClick={() => openLesson(l.id)}
-                  >
-                    <span>
-                      {progress.completed.includes(l.id) ? "✓" : fa(i + 1)}
-                    </span>
-                    {l.title}
-                  </button>
-                ))}
-              </nav>
-              <article className="ics-lesson">
-                <span className="ics-eyebrow">
-                  CHAPTER {lesson.chapter} / LESSON {index + 1} OF{" "}
-                  {lessons.length}
+          ) : !lesson ? (
+            <section className="course-loading">
+              <h1 ref={heading} tabIndex={-1}>
+                این درس پیدا نشد
+              </h1>
+              <p>از فهرست فصل‌ها یک درس را انتخاب کن.</p>
+              <button onClick={() => navigate()}>بازگشت به دوره</button>
+            </section>
+          ) : (
+            <>
+              <div className="course-breadcrumb">
+                <button onClick={() => navigate()}>دورهٔ صنعتی</button>
+                <ChevronLeft size={14} />
+                <span>فصل {fa(lesson.chapter)}</span>
+                <span className="course-duration">
+                  حدود {fa(lesson.minutes)} دقیقه برای مطالعه و تمرین
                 </span>
-                <h2>{lesson.title}</h2>
-                <p className="ics-objective">
-                  در پایان این درس: {lesson.objective}
-                </p>
-                {lesson.sections.map((s) => (
-                  <section key={s.title}>
-                    <h3>{s.title}</h3>
-                    <p>{s.text}</p>
-                  </section>
-                ))}
-                <div className="ics-worked">
-                  <span className="ics-eyebrow">WORKED EXAMPLE</span>
-                  <h3>{lesson.example.title}</h3>
-                  {lesson.example.formula && (
-                    <pre dir="ltr">{lesson.example.formula}</pre>
-                  )}
-                  <p>{lesson.example.text}</p>
-                </div>
-                <div className="ics-callout">
-                  <strong>ایدهٔ کلیدی</strong>
-                  <p>{lesson.takeaway}</p>
-                </div>
-                <button
-                  className="ics-primary"
-                  onClick={() => go(lesson.activity)}
-                >
-                  این مفهوم را امتحان کن
-                  <ArrowLeft size={16} />
-                </button>
-                <BookReading ids={reading[lesson.id]} />
-                <section className="ics-quiz">
-                  <span className="ics-tag">خودآزمایی اختیاری</span>
-                  <h3>{lesson.question.prompt}</h3>
-                  <div className="ics-options">
-                    {lesson.question.options.map((option, i) => (
-                      <button
-                        disabled={quizBusy}
-                        key={option}
-                        aria-pressed={results[lesson.id]?.choice === i}
-                        onClick={() => void answer(i)}
-                      >
-                        {option}
-                      </button>
-                    ))}
-                  </div>
-                  {quizError && <p role="alert">{quizError}</p>}
-                  {results[lesson.id] && (
-                    <p role="status" className="ics-answer">
-                      {results[lesson.id].correct
-                        ? "درست است."
-                        : "یک بار دیگر بررسی کن."}{" "}
-                      {lesson.question.explanation}
-                    </p>
-                  )}
-                  <p className="ics-note">
-                    می‌توانی بدون پاسخ‌دادن، مطالعه را ثبت کنی و ادامه بدهی.
+              </div>
+              <article className="course-reading" id="course-reading">
+                <header className="course-lesson-heading">
+                  <span className="course-kicker">
+                    درس {fa(index + 1)} از {fa(lessons.length)}
+                  </span>
+                  <h1 ref={heading} tabIndex={-1}>
+                    {lesson.title}
+                  </h1>
+                  <p className="course-goal">
+                    در پایان این درس می‌توانی: {lesson.objective}
                   </p>
-                </section>
-                <div className="ics-lesson-footer">
-                  <button
-                    onClick={() =>
-                      change({
-                        ...progress,
-                        completed: [
-                          ...new Set([...progress.completed, lesson.id]),
-                        ],
-                      })
-                    }
-                    disabled={progress.completed.includes(lesson.id)}
-                  >
-                    <Check size={16} />
-                    {progress.completed.includes(lesson.id)
-                      ? "مطالعه ثبت شد"
-                      : "این درس را خواندم"}
-                  </button>
-                  {index < lessons.length - 1 && (
-                    <button
-                      className="ics-primary"
-                      onClick={() => openLesson(lessons[index + 1].id)}
-                    >
-                      درس بعد
-                      <ArrowLeft size={16} />
+                  <div className="course-reading-tools">
+                    <button onClick={() => openReference("glossary")}>
+                      واژه‌نامه کنار درس
                     </button>
-                  )}
-                </div>
-              </article>
-            </div>
-          )}
-          {view === "tank" && <TankLab />}
-          {view === "signal" && <SignalLab />}
-          {view === "evidence" && (
-            <EvidenceLab
-              notes={notes}
-              onNotes={setNotes}
-              savedNotes={progress.notes}
-              saveNotes={() => change({ ...latest.current, notes })}
-            />
-          )}
-          {view === "atlas" && <Atlas openLesson={openLesson} />}
-          {view === "glossary" && <Glossary />}
-          {view === "roadmap" && (
-            <section>
-              <h2>از مبانی فرایند تا دفاع و تدریس</h2>
-              <p>
-                نقشهٔ کتاب شامل ۳۴ فصل در ۱۸ ماژول و برآورد ۸۱۶ ساعت است. این
-                عدد برای کل برنامهٔ پیشنهادی است؛ محتوای فعلی محصول، فصل‌های ۱ و
-                ۲ و اطلس اولیه را پوشش می‌دهد.
-              </p>
-              <div className="ics-roadmap">
-                {roadmap.map(([chapters, name, hours], i) => (
-                  <article className="ics-panel" key={name}>
-                    <span className="ics-eyebrow">
-                      MODULE / {String(i + 1).padStart(2, "0")}
-                    </span>
-                    <h3>{name}</h3>
-                    <p>
-                      فصل {chapters} · {fa(hours)} ساعت برآورد کل ماژول
-                    </p>
-                    <span className="ics-tag">
-                      {i === 0
-                        ? "فصل‌های ۱ و ۲ در دسترس؛ فصل ۳ در برنامه"
-                        : "در برنامهٔ توسعه"}
-                    </span>
-                    {i === 0 && (
-                      <button onClick={() => openLesson("process")}>
-                        شروع مبانی
-                        <ArrowLeft size={15} />
+                    <label>
+                      اندازهٔ متن
+                      <select
+                        aria-label="اندازهٔ متن"
+                        value={fontSize}
+                        onChange={(e) => {
+                          const n = Number(e.target.value);
+                          setFontSize(n);
+                          try {
+                            localStorage.setItem(
+                              "soovers-reader-font",
+                              String(n),
+                            );
+                          } catch {}
+                        }}
+                      >
+                        <option value={18}>معمولی</option>
+                        <option value={19}>درشت</option>
+                        <option value={21}>خیلی درشت</option>
+                      </select>
+                    </label>
+                  </div>
+                </header>
+                <nav className="course-jump" aria-label="بخش‌های همین درس">
+                  <button onClick={() => jump("lesson-text")}>۱. بخوان</button>
+                  <button onClick={() => jump("lesson-practice")}>
+                    ۲. تمرین کن
+                  </button>
+                  <button onClick={() => jump("lesson-wrap")}>
+                    ۳. جمع‌بندی و ادامه
+                  </button>
+                </nav>
+                <section
+                  id="lesson-text"
+                  tabIndex={-1}
+                  className="course-prose"
+                >
+                  {lesson.sections.map((section, i) => (
+                    <section key={i}>
+                      <h2>{section.title}</h2>
+                      {section.text
+                        .split("\n")
+                        .filter(Boolean)
+                        .map((p, j) => (
+                          <p key={j}>{p}</p>
+                        ))}
+                    </section>
+                  ))}
+                  <div className="course-worked">
+                    <span className="course-kicker">مثال حل‌شده</span>
+                    <h2>{lesson.example.title}</h2>
+                    {lesson.example.formula && (
+                      <pre dir="ltr">{lesson.example.formula}</pre>
+                    )}
+                    <p>{lesson.example.text}</p>
+                  </div>
+                  <div className="course-reading-references">
+                    {reading[lesson.id] && (
+                      <button onClick={() => openReference("book")}>
+                        <BookOpen size={17} />
+                        متن عمیق همین موضوع از کتاب دانشجو
                       </button>
                     )}
-                  </article>
-                ))}
-              </div>
-              <p className="ics-note">
-                ترتیب مسیر پیشنهادی است؛ هیچ آزمون یا تعیین سطحی دسترسی به
-                محتوای منتشرشده را قفل نمی‌کند.
-              </p>
-            </section>
-          )}
-          {view === "sources" && (
-            <section className="ics-sources">
-              <h2>محتوا از کجا آمده است؟</h2>
-              <article className="ics-panel">
-                <h3>کتاب دانشجو — Release 2</h3>
-                <p>
-                  Industrial Automation, ICS, SCADA, and OT Cybersecurity · Book
-                  B · 15 October 2026. سند ارسالی شما مبنای خوانش انگلیسی ۳۷ بخش
-                  درسی، ۱۴ بخش اطلس و واژه‌نامهٔ ۱۰۲ اصطلاحی است. راهنمای فارسی
-                  و تمرین‌های وب برای این محصول تدوین شده‌اند.
-                </p>
-                <a href={sharedConversation} target="_blank" rel="noreferrer">
-                  گفت‌وگوی مبنای کتاب ↗
-                </a>
-                <p>
-                  فایل‌های اصلی SANS و بستهٔ Python همراه کتاب در این مرحله
-                  دریافت نشده‌اند. ارجاع‌های S410 و S515 در خوانش انگلیسی،
-                  ارجاع‌های خود کتاب‌اند؛ به معنی بررسی مستقل جزوه‌ها یا وابستگی
-                  رسمی این آکادمی به SANS نیستند.
-                </p>
-              </article>
-              <article className="ics-panel">
-                <h3>مرجع OT و مستندات سازنده</h3>
-                <a
-                  href="https://csrc.nist.gov/pubs/sp/800/82/r3/final"
-                  target="_blank"
-                  rel="noreferrer"
+                    {lesson.sources?.length && (
+                      <details>
+                        <summary>منابع این درس</summary>
+                        {lesson.sources.map((s) => (
+                          <a
+                            key={s.url}
+                            href={s.url}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {s.title} ↗
+                          </a>
+                        ))}
+                      </details>
+                    )}
+                  </div>
+                </section>
+                <section
+                  id="lesson-practice"
+                  tabIndex={-1}
+                  className="course-practice"
                 >
-                  NIST SP 800-82 Rev. 3 ↗
-                </a>
-                <p>
-                  راهنمای منتشرشدهٔ OT؛ Rev. 4 در تاریخ بررسی ۱۵ اکتبر ۲۰۲۶
-                  پیش‌نویس عمومی است. در هر پروفایل اطلس، لینک سازنده برای بررسی
-                  دقیق مدل آمده است. معرفی مدل‌ها، ادعای میزان نصب در ایران
-                  نیست.
-                </p>
+                  <div className="course-section-heading">
+                    <span>۰۲</span>
+                    <div>
+                      <h2>حالا خودت امتحان کن</h2>
+                      <p>
+                        این تمرین بخشی از همین درس است. برای مطالعهٔ ادامه،
+                        نتیجه یا نمره‌ای لازم نیست.
+                      </p>
+                    </div>
+                  </div>
+                  {lesson.activity === "tank" ? (
+                    <TankLab />
+                  ) : lesson.activity === "signal" ? (
+                    <SignalLab />
+                  ) : lesson.activity === "evidence" ? (
+                    <EvidenceLab
+                      notes={progress.notes}
+                      onNotes={(notes) =>
+                        learning.change({ ...progress, notes }, 700)
+                      }
+                      savedNotes={progress.notes}
+                      saveNotes={learning.retry}
+                    />
+                  ) : lesson.activity === "atlas" ? (
+                    <div className="course-equipment-prompt">
+                      <h3>نقش و هویت تجهیز را جدا کن</h3>
+                      <p>
+                        یک تجهیز را در اطلس انتخاب کن. نقش آن، اتصال به فرایند و
+                        یک شاهد لازم برای تأیید وضعیتش را در دفتر زیر بنویس.
+                      </p>
+                      <button onClick={() => openReference("atlas")}>
+                        بازکردن اطلس کنار درس
+                        <ArrowLeft size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <ChapterCase key={lesson.id} lesson={lesson} />
+                  )}
+                </section>
+                <section className="course-notebook">
+                  <h2>دفتر این درس</h2>
+                  <p>
+                    {lesson.practice?.deliverable ||
+                      "برداشت خودت از مثال و تمرین را بنویس: چه مشاهده کردی، چه نتیجه‌ای گرفتی و چه چیزی هنوز نامعلوم است؟"}
+                  </p>
+                  <label>
+                    یادداشت و خروجی تمرین
+                    <textarea
+                      aria-label="یادداشت این درس"
+                      maxLength={4000}
+                      rows={5}
+                      value={workbook[lesson.id] || ""}
+                      onChange={(e) => learning.note(lesson.id, e.target.value)}
+                      placeholder="مشاهدهٔ من… دلیل… سؤال بعدی…"
+                    />
+                  </label>
+                  <div>
+                    <small>
+                      خودکار ذخیره می‌شود ·{" "}
+                      {fa((workbook[lesson.id] || "").length)} / ۴۰۰۰
+                    </small>
+                    <button
+                      onClick={() =>
+                        downloadData(`SooVers-${lesson.id}-note.json`, {
+                          lesson: lesson.id,
+                          title: lesson.title,
+                          note: workbook[lesson.id] || "",
+                          contentVersion,
+                          simulation: true,
+                        })
+                      }
+                    >
+                      دریافت یادداشت
+                      <Download size={15} />
+                    </button>
+                  </div>
+                </section>
+                <section id="lesson-wrap" tabIndex={-1} className="course-wrap">
+                  <div className="course-section-heading">
+                    <span>۰۳</span>
+                    <div>
+                      <h2>این ایده را با خودت ببر</h2>
+                      <p>{lesson.takeaway}</p>
+                    </div>
+                  </div>
+                  <details className="course-quiz">
+                    <summary>خودآزمایی اختیاری</summary>
+                    <h3>{lesson.question.prompt}</h3>
+                    <div className="ics-options">
+                      {lesson.question.options.map((option, i) => (
+                        <button
+                          key={i}
+                          disabled={quizBusy}
+                          aria-pressed={results[lesson.id]?.choice === i}
+                          onClick={() => void answer(i)}
+                        >
+                          {option}
+                        </button>
+                      ))}
+                    </div>
+                    {quizError && <p role="alert">{quizError}</p>}
+                    {results[lesson.id] && (
+                      <p role="status" className="course-feedback">
+                        {results[lesson.id].correct
+                          ? "درست است."
+                          : "یک بار دیگر بررسی کن."}{" "}
+                        {lesson.question.explanation}
+                      </p>
+                    )}
+                  </details>
+                  <div className="course-next">
+                    <p>
+                      {lesson.bridge ||
+                        (lessons[index + 1]
+                          ? `حالا آماده‌ای «${lessons[index + 1].title}» را با تکیه بر این مفهوم بخوانی.`
+                          : "مسیر را طی کردی. یادداشت‌ها و گزارش یادگیری‌ات را دریافت کن و هر بخش را که لازم است دوباره مرور کن.")}
+                    </p>
+                    <div>
+                      {index > 0 && (
+                        <button onClick={() => navigate(lessons[index - 1].id)}>
+                          <ArrowRight size={16} />
+                          درس قبل
+                        </button>
+                      )}
+                      <button className="ics-primary" onClick={next}>
+                        <Check size={17} />
+                        {index < lessons.length - 1
+                          ? "خواندم؛ ادامهٔ مسیر"
+                          : "خواندم؛ پایان مسیر"}
+                        <ArrowLeft size={17} />
+                      </button>
+                    </div>
+                    {progress.completed.includes(lesson.id) && (
+                      <small>مطالعهٔ این درس قبلاً ثبت شده است.</small>
+                    )}
+                    <button
+                      className="course-skip-lesson"
+                      onClick={() =>
+                        index < lessons.length - 1
+                          ? navigate(lessons[index + 1].id)
+                          : navigate()
+                      }
+                    >
+                      ادامه بدون ثبت مطالعه
+                    </button>
+                  </div>
+                </section>
               </article>
-              <article className="ics-panel">
-                <h3>حدود تمرین‌ها</h3>
-                <p>
-                  مخزن، داده‌ها و پرونده‌ها ساختگی‌اند. هیچ تمرین به PLC، شبکه
-                  یا تجهیز واقعی وصل نمی‌شود. شبیه‌ساز TypeScript مستقلاً در این
-                  محصول ساخته شده؛ گام زمانی و نتایج آن نباید به‌عنوان اجرای
-                  فایل Python کتاب یا رفتار تأییدشدهٔ سخت‌افزار معرفی شوند.
-                  شکل‌های تعاملی شماتیک‌اند، نه عکس یک مدل واقعی.
-                </p>
-              </article>
-              <details>
-                <summary>فهرست منابع ثبت‌شده در سند اصلی</summary>
-                <div className="ics-book-text" lang="en" dir="ltr">
-                  {book.references.map((p, i) => (
-                    <p key={i}>{p}</p>
-                  ))}
-                </div>
-              </details>
-            </section>
+            </>
           )}
-          <footer className="ics-footer">
-            <span>SOOVERS · INDUSTRIAL SYSTEMS ACADEMY</span>
-            <span>فهم فرایند، کیفیت اندازه‌گیری، تصمیم با شواهد.</span>
+          <footer className="course-footer">
+            <span>SooVers · آکادمی سیستم‌های کنترل صنعتی</span>
+            <button onClick={() => openReference("sources")}>
+              منابع و محدودهٔ محتوا
+            </button>
           </footer>
         </div>
       </div>
+      <dialog
+        ref={outline}
+        className="reader-dialog course-outline-dialog"
+        aria-label="فهرست فصل‌ها"
+      >
+        <div className="reader-dialog-head">
+          <h2>فهرست فصل‌ها</h2>
+          <button
+            aria-label="بستن فهرست"
+            onClick={() => outline.current?.close()}
+          >
+            <X size={20} />
+          </button>
+        </div>
+        {commonOutline}
+      </dialog>
+      <dialog
+        ref={library}
+        className="reader-dialog course-reference-dialog"
+        aria-label="کتابخانه کنار درس"
+      >
+        <div className="reader-dialog-head">
+          <div>
+            <h2>کتابخانه کنار درس</h2>
+            <small>با بستن این پنجره، به همان جای درس برمی‌گردی.</small>
+          </div>
+          <button
+            aria-label="بستن کتابخانه"
+            onClick={() => library.current?.close()}
+          >
+            <X size={20} />
+          </button>
+        </div>
+        <nav aria-label="بخش‌های کتابخانه">
+          {(["glossary", "atlas", "book", "sources"] as Reference[]).map(
+            (kind, i) => (
+              <button
+                key={kind}
+                aria-pressed={reference === kind}
+                onClick={() => setReference(kind)}
+              >
+                {["واژه‌نامه", "اطلس تجهیزات", "کتاب دانشجو", "منابع دوره"][i]}
+              </button>
+            ),
+          )}
+        </nav>
+        <div className="course-reference-body">
+          {reference === "glossary" ? (
+            <Glossary />
+          ) : reference === "atlas" ? (
+            <Atlas openLesson={navigate} />
+          ) : reference === "book" ? (
+            reading[validLesson.id] ? (
+              <BookReading ids={reading[validLesson.id]} />
+            ) : (
+              <>
+                <h3>خوانش کتاب برای فصل‌های ۱ و ۲</h3>
+                <p>
+                  این فصل به‌صورت مستقل برای آکادمی تألیف شده است. منابع آن در
+                  پایان متن درس قرار دارند.
+                </p>
+                <button onClick={() => navigate("process")}>
+                  بازکردن فصل اول
+                </button>
+              </>
+            )
+          ) : (
+            <CourseSources />
+          )}
+        </div>
+      </dialog>
     </main>
   );
 }
-function Atlas({ openLesson }: { openLesson: (id: string) => void }) {
-  const [query, setQuery] = useState(""),
-    [category, setCategory] = useState("همه"),
-    [selected, setSelected] = useState(devices[0].id);
-  const filtered = devices.filter(
-    (d) =>
-      (category === "همه" || d.category === category) &&
-      (d.name + " " + d.role).toLowerCase().includes(query.toLowerCase()),
-  );
-  const device = devices.find((d) => d.id === selected) ?? devices[0];
-  return (
-    <section>
-      <div className="ics-section-head">
-        <div>
-          <h2>تجهیز را از نقشش بشناس</h2>
-          <p>
-            ۱۲ نمونهٔ واقعی؛ نقش، مسیر اتصال، خطاهای محتمل و شواهد موردنیاز.
-          </p>
-        </div>
-      </div>
-      <div className="ics-filters">
-        <label>
-          <Search size={16} />
-          <input
-            placeholder="جست‌وجوی مدل یا نقش…"
-            aria-label="جست‌وجوی تجهیزات"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </label>
-        <select
-          aria-label="گروه تجهیزات"
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-        >
-          {[
-            "همه",
-            "کنترلر و I/O",
-            "ابزار دقیق و عملگر",
-            "نمایش، شبکه و برق",
-          ].map((c) => (
-            <option key={c}>{c}</option>
-          ))}
-        </select>
-      </div>
-      <div className="ics-atlas">
-        <div className="ics-device-list">
-          {filtered.map((d) => (
-            <button
-              aria-pressed={d.id === selected}
-              key={d.id}
-              onClick={() => setSelected(d.id)}
-            >
-              <span>{d.category}</span>
-              <b dir="ltr">{d.name}</b>
-            </button>
-          ))}
-          {!filtered.length && (
-            <p>تجهیزی پیدا نشد. عبارت یا گروه را تغییر بده.</p>
-          )}
-        </div>
-        <article className="ics-device-detail">
-          <span className="ics-tag">{device.category}</span>
-          <h3 dir="ltr">{device.name}</h3>
-          {[
-            ["نقش در سیستم", device.role],
-            ["کاربرد آموزشی", device.use],
-            ["اتصال‌ها", device.connections],
-            ["شناسنامهٔ دقیق", device.identity],
-            ["اشتباه رایج در تشخیص", device.failure],
-            ["شواهد قابل بررسی", device.evidence],
-          ].map(([title, text]) => (
-            <section key={title}>
-              <h4>{title}</h4>
-              <p>{text}</p>
-            </section>
-          ))}
-          <div className="ics-actions">
-            <a
-              className="ics-primary"
-              href={device.source}
-              target="_blank"
-              rel="noreferrer"
-            >
-              صفحهٔ سازنده و تصاویر مرجع ↗
-            </a>
-            <button onClick={() => openLesson(device.lesson)}>
-              درس مرتبط
-              <ArrowLeft size={15} />
-            </button>
-          </div>
-          <BookReading ids={["E" + (devices.indexOf(device) + 1)]} />
-        </article>
-      </div>
-    </section>
-  );
-}
-function Glossary() {
+function CourseOutline({
+  selected,
+  completed,
+  onOpen,
+}: {
+  selected?: string;
+  completed: string[];
+  onOpen: (id: string) => void;
+}) {
   const [query, setQuery] = useState("");
-  const entries = book.glossary.filter((row) =>
-    row.join(" ").toLowerCase().includes(query.toLowerCase()),
+  const outlineRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const element = outlineRef.current?.querySelector<HTMLElement>(
+      '[aria-current="step"]',
+    );
+    const scroller =
+      outlineRef.current?.closest<HTMLElement>(".course-sidebar");
+    if (element && scroller) {
+      const box = element.getBoundingClientRect(),
+        area = scroller.getBoundingClientRect();
+      if (box.bottom > area.bottom || box.top < area.top)
+        scroller.scrollTop += box.top - area.top - scroller.clientHeight / 2;
+    }
+  }, [selected]);
+  const filtered = chapters.filter(
+    (ch) =>
+      !query ||
+      (
+        ch.title +
+        " " +
+        ch.number +
+        " " +
+        fa(ch.number) +
+        " " +
+        ch.lessons.map((l) => l.title).join(" ")
+      )
+        .toLocaleLowerCase()
+        .includes(query.toLocaleLowerCase()),
   );
   return (
-    <section>
-      <h2>زبان مشترک IT و OT</h2>
-      <p>
-        ۱۰۲ اصطلاح از واژه‌نامهٔ کتاب دانشجو؛ معادل فارسی و تعریف اصلی انگلیسی.
-      </p>
-      <label className="ics-glossary-search">
-        <Search size={18} />
+    <div className="course-outline" ref={outlineRef}>
+      <label className="course-search">
+        <Search size={16} />
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="مثلاً PLC، کالیبراسیون، فشار…"
-          aria-label="جست‌وجوی واژه‌نامه"
+          placeholder="نام درس یا شمارهٔ فصل…"
+          aria-label="جست‌وجوی درس‌ها"
         />
       </label>
-      <p>{fa(entries.length)} اصطلاح</p>
-      <dl className="ics-glossary">
-        {entries.map(([en, faText, meaning]) => (
-          <div key={en}>
-            <dt>
-              <b dir="ltr">{en}</b>
-              <span>{faText}</span>
-            </dt>
-            <dd lang="en" dir="ltr">
-              {meaning}
-            </dd>
-          </div>
+      <nav aria-label="فصل‌های دوره">
+        {filtered.map((ch) => (
+          <details
+            key={ch.number}
+            open={
+              query
+                ? true
+                : ch.lessons.some((l) => l.id === selected) || undefined
+            }
+          >
+            <summary
+              aria-current={
+                ch.lessons.length === 1 && ch.lessons[0].id === selected
+                  ? "step"
+                  : undefined
+              }
+              onClick={(e) => {
+                if (ch.lessons.length === 1) {
+                  e.preventDefault();
+                  onOpen(ch.lessons[0].id);
+                }
+              }}
+            >
+              <span>{fa(ch.number)}</span>
+              <b>{ch.title}</b>
+              {ch.lessons.every((l) => completed.includes(l.id)) && (
+                <Check size={14} />
+              )}
+            </summary>
+            {ch.lessons.length > 1 &&
+              ch.lessons.map((l) => (
+                <button
+                  key={l.id}
+                  aria-current={selected === l.id ? "step" : undefined}
+                  onClick={() => onOpen(l.id)}
+                >
+                  <span>
+                    {completed.includes(l.id) ? <Check size={14} /> : "—"}
+                  </span>
+                  {l.title}
+                </button>
+              ))}
+          </details>
         ))}
-      </dl>
-      {!entries.length && <p>واژه‌ای پیدا نشد؛ عبارت کوتاه‌تری بنویس.</p>}
+      </nav>
+      {!filtered.length && <p>درسی پیدا نشد. عبارت کوتاه‌تری بنویس.</p>}
+    </div>
+  );
+}
+function CourseSources() {
+  return (
+    <section className="course-source-copy">
+      <h3>منابع و روش تدوین</h3>
+      <p>
+        فصل‌های ۱ و ۲ بر اساس سند Industrial Automation — Book B, Student
+        Release 2 ساخته شده‌اند و ۳۷ بخش درسی و ۱۴ بخش اطلس از متن انگلیسی آن در
+        کتابخانه قابل مطالعه‌اند.
+      </p>
+      <p>
+        راهنمای فصل‌های ۳ تا ۳۴، متن و پرونده‌های تألیفی آکادمی است و ترتیب
+        سرفصل‌های طرح کتاب را دنبال می‌کند. منابع اولیهٔ هر درس همان‌جا
+        آمده‌اند. این راهنما جایگزین تمام ۸۱۶ ساعت برنامهٔ پیشنهادی یا آموزش
+        عملی با سخت‌افزار نیست.
+      </p>
+      <a href={sharedConversation} target="_blank" rel="noreferrer">
+        گفت‌وگوی مرجع کتاب ↗
+      </a>
+      <p>
+        فایل‌های اصلی SANS، کتاب مدرس و بستهٔ Python همراه کتاب دریافت نشده‌اند؛
+        ارجاع‌های آن‌ها در متن انگلیسی، متعلق به خود کتاب است. ادعای تأیید یا
+        مدرک رسمی SANS نداریم.
+      </p>
+      <h3>تمرین‌های این نسخه</h3>
+      <p>
+        داده‌ها و سناریوها آموزشی و ساختگی‌اند؛ ابزارها به شبکه یا تجهیز صنعتی
+        وصل نمی‌شوند. یادداشت‌ها و پیشرفت ذخیره می‌شوند؛ اجرای شبیه‌ساز و
+        انتخاب‌های پرونده با خروج از درس بازنشانی می‌شوند و می‌توان خروجی آن‌ها
+        را دریافت کرد.
+      </p>
+      <a
+        href="https://csrc.nist.gov/pubs/sp/800/82/r3/final"
+        target="_blank"
+        rel="noreferrer"
+      >
+        NIST SP 800-82 Rev. 3 ↗
+      </a>
     </section>
   );
 }

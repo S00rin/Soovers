@@ -1,4 +1,4 @@
-# ICS foundations: content and product scope
+# Industrial academy: content and product scope
 
 The industrial academy is the default static demo and a separate learning workspace in the account-backed product. The F5 course and campus remain accessible. Placement, quizzes, and evidence self-checks are optional; completing a reading does not require a score.
 
@@ -33,7 +33,19 @@ python3 scripts/import-ics-book.py /absolute/path/to/Industrial_Automation_Book_
 | Device identity and coverage | 2.16, E13–E14 |
 | Evidence collection and qualified conclusions | 1.17–1.19, 2.13, 2.17–2.18 |
 
-Each of the twelve equipment profiles links to its E1–E12 source reading and manufacturer documentation. They are representative learning examples, not a market-share claim. The glossary preserves the source's English definitions and Persian equivalents. The roadmap preserves the 18-module / 34-chapter / 816-hour design estimate; Chapters 3–34 are explicitly not delivered teaching content.
+Each of the twelve equipment profiles links to its E1–E12 source reading and manufacturer documentation. They are representative learning examples, not a market-share claim. The glossary preserves the source's English definitions and Persian equivalents. The reference roadmap has 18 modules and 34 chapters. This release provides an original guide for every chapter; the reference estimate of 816 classroom hours is not a duration claim for this web edition.
+
+### Original continuation, chapters 3–34
+
+`lib/ics/chapters.json` supplies 32 original Persian guides, about 15,800 whitespace-delimited words of theory plus worked examples, 192 explanatory sections, 32 evidence cases and 64 reasoning decisions. The existing ten foundation lessons bring the total to 42 lessons. Each guide has an objective, explanation, worked example, misconception discussion, optional knowledge check, case evidence, reasoning feedback, deliverable and transition. Chapters 32–33 are distinct petrochemical and power-generation capstones, with rubrics; chapter 34 uses teach-back.
+
+The exact source roadmap is retained, including S7 with Modbus in chapter 9, PROFIBUS in chapter 10, IEC101 in chapter 13, MAPCS/T3000 in chapter 20, Yokogawa/Honeywell/safety families in chapter 21, and Emerson/Schneider/GE/Rockwell/network families in chapter 22. New content is academy-authored and is never presented as unseen text from Book A, Book B chapters 3–34, or SANS PDFs. All new case datasets are fictional.
+
+The guides carry 49 distinct primary-reference URLs. Checks included ISA, NI, Modbus, PI, ODVA, FieldComm, OPC Foundation, DNP, IEC, NIST, HSE, manufacturer pages, government incident advisories, and Wireshark/Zeek/Splunk documentation. Siemens documentation shells were reachable but their full manuals were not independently retrieved; paid IEC standards were not accessed. Some direct CISA and manufacturer pages returned 403, so only verified official excerpts or established publication context support the bounded claims. No installed firmware, proprietary laboratory environment, physical protection function or market share was validated. MAPCS compatibility, detailed logging and recovery claims remain explicitly unverified.
+
+### Continuous reading interface
+
+Desktop and mobile start in a conventional course reader; the 3D campus remains an explicit optional destination. A searchable chapter outline, stable lesson URLs and browser Back support a single reading sequence. Each lesson embeds its experiment or case, a saved notebook, optional review and a read-and-continue action. Glossary, atlas and original text use a native modal with keyboard dismissal and focus return. Text size is adjustable. Completion is never conditional on quiz answers.
 
 ## Interactive workbenches
 
@@ -49,16 +61,16 @@ The NIST [SP 800-82 Rev. 3 page](https://csrc.nist.gov/pubs/sp/800/82/r3/final) 
 
 ## Persistence and migration
 
-`002_ics.sql` adds separate per-user ICS progress and assessment tables. It does not rewrite F5 data. Read completion is self-reported and independent of optional quizzes. Quiz results are graded on the server for signed-in users; the static demo grades locally. The server rejects forged result fields, unknown lesson IDs, overlong notes and writes from a stale account identity. Sessions and CSRF controls apply to all ICS API routes.
+`002_ics.sql` adds separate per-user ICS progress and assessment tables. `003_ics_workbook.sql` adds per-user, per-lesson written work without rewriting previous records. It does not rewrite F5 data. Read completion is self-reported and independent of optional quizzes. Quiz results are graded on the server for signed-in users; the static demo grades locally. The server rejects forged result fields, unknown lesson IDs, overlong notes and writes from a stale account identity. Sessions and CSRF controls apply to all ICS API routes.
 
-Study state and evidence notes persist; simulator runs and filter selections reset on leaving their workbench. Simulation CSVs and note exports are available for keeping a run. Notes are saved using the explicit save button; pending changes are indicated. Static preview state belongs to its browser origin and does not migrate automatically into account records.
+Study state and evidence notes persist; simulator runs and filter selections reset on leaving their workbench. Simulation CSVs and note exports are available for keeping a run. Evidence notes and per-lesson work autosave after a short pause; pending changes and failed-save recovery are visible. Written work is limited to 4,000 characters per lesson and is included in reports. Static preview state belongs to its browser origin and does not migrate automatically into account records.
 
 ## Verification
 
 - `pnpm check` checks application and content types.
 - `pnpm test:ics` checks engineering calculations, mass balance, P equilibrium, sensor/HMI distinctions, content coverage, account isolation, validation, restart persistence and independence from F5 enrollment.
 - `pnpm test:ics:browser` checks the delivered static and account-backed journeys, optional quizzes, direct access to the last lesson, source reading, simulations and exports, evidence-note persistence, equipment/glossary search, every mobile view, denied local storage and failed-save recovery.
-- Full product API/browser regression suites and the Docker persistence/backup smoke test remain in CI. Container checks include an ICS note surviving restart.
+- Full product API/browser regression suites and the Docker persistence/backup smoke test remain in CI. Container checks include an ICS evidence note and per-lesson workbook surviving restart. An upgrade fixture verifies that adding the workbook table preserves the preceding release’s progress and notes.
 
 ## Existing campus narration
 

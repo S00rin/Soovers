@@ -56,8 +56,8 @@ test("tank conserves volume, predicts P offset and separates frozen measurement 
   assert.equal(advanceTank(normal, "normal", "P", 60).length, 1201);
 });
 test("content links are complete; roadmap totals are plans, and assessments are not prerequisites", async () => {
-  assert.equal(lessons.length, 10);
-  assert.equal(new Set(lessons.map((l) => l.id)).size, 10);
+  assert.equal(lessons.length, 42);
+  assert.equal(new Set(lessons.map((l) => l.id)).size, 42);
   assert.equal(devices.length, 12);
   assert.equal(
     roadmap.reduce((s, r) => s + r[2], 0),
@@ -85,4 +85,40 @@ test("content links are complete; roadmap totals are plans, and assessments are 
   assert.equal(Object.keys(book.sections).length, 51);
   assert.equal(book.glossary.length, 102);
   assert.ok(book.sections["2.15"].blocks.length > 0);
+});
+
+// Every advertised chapter has original teaching, worked reasoning and a usable exercise.
+test("all 34 chapters have substantive teaching and contextual exercises", () => {
+  assert.deepEqual(
+    [...new Set(lessons.map((l) => l.chapter))],
+    Array.from({ length: 34 }, (_, i) => i + 1),
+  );
+  for (const l of lessons.filter((l) => l.chapter > 2)) {
+    assert.ok(l.sections.length >= 5, l.id);
+    assert.ok(
+      l.sections
+        .map((s) => s.text)
+        .join(" ")
+        .split(/\s+/).length >= 350,
+      l.id + " too thin",
+    );
+    assert.ok(l.example.text.length > 80);
+    assert.equal(l.activity, "case");
+    assert.equal(l.practice.steps.length, 2);
+    assert.ok(l.practice.evidence.length >= 2);
+    for (const q of [l.question, ...l.practice.steps]) {
+      assert.equal(q.options.length, 3);
+      assert.ok(Number.isInteger(q.answer) && q.answer >= 0 && q.answer < 3);
+      assert.ok(q.explanation.length > 50);
+    }
+    assert.ok(l.sources.length > 0);
+    for (const s of l.sources) assert.match(s.url, /^https:\/\//);
+  }
+  const legacy = parseProgress({
+    lesson: "mismatch",
+    completed: ["process", "scaling"],
+    notes: "legacy",
+  });
+  assert.equal(legacy.lesson, "mismatch");
+  assert.deepEqual(legacy.completed, ["process", "scaling"]);
 });

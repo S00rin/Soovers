@@ -1,6 +1,7 @@
 /** Original Persian lessons adapted from the supplied Book B and shared conversation.
  * See docs/ICS_CONTENT.md for provenance, delivered scope and unavailable attachments. */
-export const contentVersion = "ics-foundations-1";
+import continuation from "./chapters.json" with { type: "json" };
+export const contentVersion = "ics-course-2";
 export const sharedConversation =
   "https://chatgpt.com/share/6ad0c0d2-2174-83eb-9a5d-3b4d9f5ec252";
 export type Lesson = {
@@ -12,7 +13,21 @@ export type Lesson = {
   sections: { title: string; text: string }[];
   example: { title: string; formula?: string; text: string };
   takeaway: string;
-  activity: "tank" | "signal" | "evidence" | "atlas";
+  activity: "tank" | "signal" | "evidence" | "atlas" | "case";
+  bridge?: string;
+  sources?: { title: string; url: string }[];
+  practice?: {
+    title: string;
+    setup: string;
+    evidence: { label: string; text: string }[];
+    steps: {
+      prompt: string;
+      options: string[];
+      answer: number;
+      explanation: string;
+    }[];
+    deliverable: string;
+  };
   question: {
     prompt: string;
     options: string[];
@@ -20,7 +35,7 @@ export type Lesson = {
     explanation: string;
   };
 };
-export const lessons: Lesson[] = [
+const foundations: Lesson[] = [
   {
     id: "process",
     chapter: 1,
@@ -190,7 +205,7 @@ export const lessons: Lesson[] = [
       text: "سناریوهای «حسگر ثابت» و «HMI قدیمی» را تا ثانیهٔ ۱۲۰۰ اجرا کن. در اولی PV ثابت است؛ در دومی PV می‌تواند تغییر کند ولی سن نمایش زیاد می‌شود. این شواهد محل اختلاف را محدود می‌کنند، نه هویت عامل را.",
     },
     takeaway: "تازگی، درستی و استقلال سه ویژگی جداگانهٔ شواهد هستند.",
-    activity: "evidence",
+    activity: "tank",
     question: {
       prompt: "HMI و Historian هر دو ۱ متر نشان می‌دهند؛ نتیجهٔ درست چیست؟",
       options: [
@@ -382,6 +397,11 @@ export const lessons: Lesson[] = [
     },
   },
 ];
+export const lessons: Lesson[] = [
+  ...foundations,
+  ...(continuation as Lesson[]),
+];
+
 export const roadmap = [
   ["۱–۳", "فرایند، اندازه‌گیری و نقشه‌های مهندسی", 52],
   ["۴", "دینامیک، PID، حالت‌ها و توالی", 38],

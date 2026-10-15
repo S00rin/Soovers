@@ -1,6 +1,8 @@
+import { DatabaseSync } from "node:sqlite";
+import { openDatabase } from "../server/database.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createApplication } from "../server/app.mjs";
@@ -63,7 +65,7 @@ await test("ICS account progress, optional assessments, isolation and upgrade pe
     assert.equal((await req("/ics/progress", "PATCH", save, a)).status, 200);
     assert.equal(
       (await req("/ics", "GET", {}, a)).body.progress.completed.length,
-      10,
+      lessons.length,
     );
     assert.deepEqual(
       (await req("/ics", "GET", {}, b)).body.progress.completed,
@@ -135,9 +137,77 @@ await test("ICS account progress, optional assessments, isolation and upgrade pe
       (await req("/course", "GET", {}, a)).body.course.id,
       "f5-big-ip",
     );
+    assert.equal(
+      (
+        await req(
+          "/ics/workbook",
+          "PUT",
+          { lesson: "process", note: "برداشت مستقل دانشجو", expectedUserId },
+          a,
+        )
+      ).status,
+      200,
+    );
+    assert.equal(
+      (
+        await req(
+          "/ics/workbook",
+          "PUT",
+          { lesson: "process", note: "اختلاط حساب", expectedUserId },
+          b,
+        )
+      ).status,
+      409,
+    );
+    assert.equal(
+      (
+        await req(
+          "/ics/workbook",
+          "PUT",
+          { lesson: "invalid", note: "x", expectedUserId },
+          a,
+        )
+      ).status,
+      400,
+    );
+    assert.equal(
+      (
+        await req(
+          "/ics/workbook",
+          "PUT",
+          { lesson: "process", note: "x".repeat(4001), expectedUserId },
+          a,
+        )
+      ).status,
+      400,
+    );
+    assert.equal(
+      (
+        await req(
+          "/ics/workbook",
+          "PUT",
+          { lesson: "process", note: "x", score: 100, expectedUserId },
+          a,
+        )
+      ).status,
+      400,
+    );
+    assert.equal(
+      (
+        await req(
+          "/ics/workbook",
+          "PUT",
+          { lesson: "process", note: 42, expectedUserId },
+          a,
+        )
+      ).status,
+      400,
+    );
+    assert.deepEqual((await req("/ics", "GET", {}, b)).body.workbook, {});
     await app.close();
     await start();
     const restored = (await req("/ics/report", "GET", {}, a)).body;
+    assert.equal(restored.workbook.process, "برداشت مستقل دانشجو");
     assert.equal(restored.progress.notes, save.notes);
     assert.equal(restored.progress.lesson, "evidence");
     assert.equal(restored.results.scaling.correct, true);
@@ -149,10 +219,67 @@ await test("ICS account progress, optional assessments, isolation and upgrade pe
     assert.deepEqual((await req("/ics/report", "GET", {}, b)).body.results, {});
     assert.equal(
       app.db.prepare("SELECT COUNT(*) AS n FROM migrations").get().n,
-      2,
+      3,
     );
   } finally {
     await app?.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+await test("adding per-lesson workbooks preserves a database from the previous release", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "ics-upgrade-"));
+  const filename = path.join(directory, "legacy.sqlite");
+  let db = new DatabaseSync(filename);
+  try {
+    db.exec(
+      "CREATE TABLE migrations(name TEXT PRIMARY KEY,applied_at TEXT NOT NULL)",
+    );
+    for (const name of ["001_academy.sql", "002_ics.sql"]) {
+      db.exec(
+        await readFile(
+          new URL("../migrations/" + name, import.meta.url),
+          "utf8",
+        ),
+      );
+      db.prepare("INSERT INTO migrations VALUES (?,?)").run(name, "2026-10-15");
+    }
+    db.prepare("INSERT INTO users VALUES (?,?,?,?,?)").run(
+      "legacy",
+      "legacy@example.test",
+      "Legacy learner",
+      "fixture-only",
+      "2026-10-15",
+    );
+    db.prepare("INSERT INTO ics_progress VALUES (?,?,?,?,?)").run(
+      "legacy",
+      "mismatch",
+      '["process","scaling"]',
+      "Existing evidence note",
+      "2026-10-15",
+    );
+    db.close();
+    db = openDatabase(filename);
+    assert.equal(
+      db.prepare("SELECT notes FROM ics_progress").get().notes,
+      "Existing evidence note",
+    );
+    assert.equal(
+      db.prepare("SELECT completed FROM ics_progress").get().completed,
+      '["process","scaling"]',
+    );
+    db.prepare("INSERT INTO ics_workbook VALUES (?,?,?,?)").run(
+      "legacy",
+      "drawings",
+      "New chapter work",
+      "2026-10-15",
+    );
+    assert.equal(
+      db.prepare("SELECT note FROM ics_workbook").get().note,
+      "New chapter work",
+    );
+  } finally {
+    db.close();
     await rm(directory, { recursive: true, force: true });
   }
 });

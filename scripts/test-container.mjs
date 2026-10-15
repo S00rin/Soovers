@@ -75,7 +75,27 @@ try {
     { chapter: 3, parts: [0, 1, 2], answers: {} },
     account.cookie,
   );
-  await request("/ics/progress", "PATCH", {expectedUserId:account.body.user.id,lesson:"mismatch",completed:["process"],notes:"ICS recovery check"}, account.cookie);
+  await request(
+    "/ics/progress",
+    "PATCH",
+    {
+      expectedUserId: account.body.user.id,
+      lesson: "mismatch",
+      completed: ["process"],
+      notes: "ICS recovery check",
+    },
+    account.cookie,
+  );
+  await request(
+    "/ics/workbook",
+    "PUT",
+    {
+      expectedUserId: account.body.user.id,
+      lesson: "drawings",
+      note: "Per-lesson workbook survives restart",
+    },
+    account.cookie,
+  );
   docker("restart", name);
   base = "http://" + docker("port", name, "8080/tcp");
   await ready();
@@ -84,7 +104,14 @@ try {
       .chapter,
     3,
   );
-  assert.equal((await request("/ics", "GET", {}, account.cookie)).body.progress.notes, "ICS recovery check");
+  assert.equal(
+    (await request("/ics", "GET", {}, account.cookie)).body.progress.notes,
+    "ICS recovery check",
+  );
+  assert.equal(
+    (await request("/ics", "GET", {}, account.cookie)).body.workbook.drawings,
+    "Per-lesson workbook survives restart",
+  );
   docker(
     "exec",
     name,

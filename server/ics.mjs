@@ -3,7 +3,7 @@ import {
   parseProgress,
   gradeAnswer,
 } from "../lib/ics/model.ts";
-import { contentVersion } from "../lib/ics/content.ts";
+import { contentVersion, lessons } from "../lib/ics/content.ts";
 import { transaction } from "./database.mjs";
 export function icsRecord(db, userId) {
   const row = db
@@ -28,6 +28,12 @@ export function icsRecord(db, userId) {
         }
       : initialProgress(),
     results,
+    workbook: Object.fromEntries(
+      db
+        .prepare("SELECT lesson,note FROM ics_workbook WHERE user_id=?")
+        .all(userId)
+        .map((r) => [r.lesson, r.note]),
+    ),
     updatedAt: row?.updated_at ?? null,
   };
 }
@@ -38,6 +44,7 @@ export async function handleIcs({ route, db, user, req, body, json, fail }) {
       "PATCH /api/ics/progress",
       "POST /api/ics/assessment",
       "GET /api/ics/report",
+      "PUT /api/ics/workbook",
     ].includes(route)
   )
     return false;
@@ -60,6 +67,22 @@ export async function handleIcs({ route, db, user, req, body, json, fail }) {
   const input = await body(req);
   if (input.expectedUserId !== user.id)
     fail(409, "حساب تغییر کرده است؛ صفحه را دوباره باز کنید.");
+  if (route === "PUT /api/ics/workbook") {
+    if (
+      Object.keys(input).some(
+        (k) => !["expectedUserId", "lesson", "note"].includes(k),
+      ) ||
+      !lessons.some((l) => l.id === input.lesson) ||
+      typeof input.note !== "string" ||
+      input.note.length > 4000
+    )
+      fail(400, "یادداشت درس معتبر نیست.");
+    db.prepare(
+      "INSERT INTO ics_workbook(user_id,lesson,note,updated_at) VALUES (?,?,?,?) ON CONFLICT(user_id,lesson) DO UPDATE SET note=excluded.note,updated_at=excluded.updated_at",
+    ).run(user.id, input.lesson, input.note, new Date().toISOString());
+    json(200, { ok: true });
+    return true;
+  }
   if (route === "PATCH /api/ics/progress") {
     const { expectedUserId, ...submitted } = input;
     const clean = parseProgress(submitted);

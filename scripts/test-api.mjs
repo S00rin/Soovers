@@ -395,7 +395,7 @@ await test("persistent academy API and access boundaries", async (t) => {
         assert.equal(
           app.db.prepare("SELECT count(*) AS count FROM migrations").get()
             .count,
-          2,
+          3,
         );
       },
     );
