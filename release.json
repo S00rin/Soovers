@@ -1,10 +1,12 @@
 {
   "product": "SooVers Academy",
   "version": "1.0.0",
-  "contentVersion": "ics-foundations-1",
-  "sourceCommit": "21f2748f3ad0b1a9ac4a554024a48b4f73faa644",
+  "contentVersion": "ics-course-2",
+  "sourceCommit": "f4c57407fc37171acafe5dab63a052f471932034",
   "defaultAcademy": "ics",
   "mode": "browser-local-demo",
   "placementRequired": false,
-  "assessmentRequired": false
+  "assessmentRequired": false,
+  "chapters": 34,
+  "lessons": 42
 }
