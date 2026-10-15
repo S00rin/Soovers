@@ -1,7 +1,10 @@
 {
   "product": "SooVers Academy",
   "version": "1.0.0",
-  "sourceCommit": "0af4a5d66313604aa3531e310e1f819f85d7ef90",
+  "contentVersion": "ics-foundations-1",
+  "sourceCommit": "21f2748f3ad0b1a9ac4a554024a48b4f73faa644",
+  "defaultAcademy": "ics",
   "mode": "browser-local-demo",
-  "placementRequired": false
+  "placementRequired": false,
+  "assessmentRequired": false
 }

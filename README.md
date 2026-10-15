@@ -1,7 +1,11 @@
-# SooVers Academy demo
+# SooVers industrial academy demo
 
-[Open the hosted demo](https://soovers-academy-demo.nutmegtern65.chatgpt.site) with the owning ChatGPT account. The demo requires no academy registration; progress is browser-local and placement is optional.
+[Open the hosted demo](https://soovers-academy-demo.nutmegtern65.chatgpt.site) with the owning ChatGPT account. No academy registration is required; progress stays in this browser. Placement and all knowledge checks are optional.
 
-[Download the portable demo](https://github.com/S00rin/Soovers/raw/refs/heads/demo/downloads/SooVers_Demo_1.0.0.zip): extract and run `node run.mjs` with Node 24+, or double-click `START_WINDOWS.bat`.
+The default academy covers Chapters 1–2 of the supplied student workbook: ten Persian lessons, deeper original English reading, three interactive workbenches, twelve equipment profiles and a 102-term glossary. Later chapters are explicitly a development roadmap.
 
-[Product source and Docker deployment](https://github.com/S00rin/Soovers/tree/main). SHA-256 checksum files are in `downloads/`.
+Use `#demo` for the F5 academy and `#tower` for the campus. Existing Persian campus narration is preserved.
+
+[Product source and Docker deployment](https://github.com/S00rin/Soovers/tree/main) · [Content scope and provenance](https://github.com/S00rin/Soovers/blob/main/docs/ICS_CONTENT.md).
+
+The archives in `downloads/` are the earlier F5 v1.0.0 release and remain unchanged. They do not contain the industrial academy; use this branch or the hosted demo for the current content.
